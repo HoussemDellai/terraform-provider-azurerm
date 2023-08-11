@@ -1,16 +1,18 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package sql
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql" // nolint: staticcheck
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/sql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
@@ -26,7 +28,7 @@ func resourceSqlInstanceFailoverGroup() *pluginsdk.Resource {
 		Update: resourceSqlInstanceFailoverGroupCreateUpdate,
 		Delete: resourceSqlInstanceFailoverGroupDelete,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_sql_managed_instance_failover_group` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_managed_instance_failover_group` resource instead."),
+		DeprecationMessage: "The `azurerm_sql_managed_instance_failover_group` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_managed_instance_failover_group` resource instead.",
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
 			_, err := parse.InstanceFailoverGroupID(id)
@@ -48,9 +50,9 @@ func resourceSqlInstanceFailoverGroup() *pluginsdk.Resource {
 				ValidateFunc: validate.ValidateMsSqlFailoverGroupName,
 			},
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"managed_instance_name": {
 				Type:         pluginsdk.TypeString,
@@ -326,7 +328,7 @@ func flattenSqlInstanceFailoverGroupPrimaryInstance(input *[]sql.ManagedInstance
 		}
 	}
 
-	managedInstanceId, err := parse.ManagedInstanceID(id)
+	managedInstanceId, err := parse.ManagedInstanceIDInsensitively(id)
 	if err != nil {
 		return "", err
 	}

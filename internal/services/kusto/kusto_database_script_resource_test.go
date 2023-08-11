@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kusto_test
 
 import (
@@ -5,12 +8,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/kusto/2023-05-02/scripts"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/kusto/parse"
-	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 )
 
 type KustoScriptResource struct{}
@@ -25,7 +28,7 @@ func TestAccKustoScript_basic(t *testing.T) {
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 	})
 }
 
@@ -53,7 +56,7 @@ func TestAccKustoScript_complete(t *testing.T) {
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 	})
 }
 
@@ -67,21 +70,21 @@ func TestAccKustoScript_update(t *testing.T) {
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 		{
 			Config: r.complete(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 		{
 			Config: r.basic(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 	})
 }
 
@@ -98,23 +101,42 @@ func TestAccKustoScript_multiple(t *testing.T) {
 				check.That(fmt.Sprintf("%s%d", data.ResourceName, 4)).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("sas_token"),
+		data.ImportStep("sas_token", "script_content"),
 	})
 }
 
-func (r KustoScriptResource) Exists(ctx context.Context, client *clients.Client, state *terraform.InstanceState) (*bool, error) {
-	id, err := parse.ScriptID(state.ID)
+func TestAccKustoScript_scriptContent(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_kusto_script", "test")
+	r := KustoScriptResource{}
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.scriptContent(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep("sas_token", "script_content"),
+	})
+}
+
+func (r KustoScriptResource) Exists(ctx context.Context, client *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
+	id, err := scripts.ParseScriptID(state.ID)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Kusto.ScriptsClient.Get(ctx, id.ResourceGroup, id.ClusterName, id.DatabaseName, id.Name)
+
+	resp, err := client.Kusto.ScriptsClient.Get(ctx, *id)
+	exists := true
+
 	if err != nil {
-		if utils.ResponseWasNotFound(resp.Response) {
-			return utils.Bool(false), nil
+		if response.WasNotFound(resp.HttpResponse) {
+			exists = false
+		} else {
+			return nil, fmt.Errorf("retrieving %q: %+v", id, err)
 		}
-		return nil, fmt.Errorf("retrieving %q: %+v", id, err)
 	}
-	return utils.Bool(true), nil
+
+	return &exists, nil
 }
 
 func (r KustoScriptResource) template(data acceptance.TestData) string {
@@ -287,4 +309,18 @@ resource "azurerm_kusto_script" "test4" {
 }
 `, template, data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger,
 		data.RandomInteger, data.RandomInteger, data.RandomInteger)
+}
+
+func (r KustoScriptResource) scriptContent(data acceptance.TestData) string {
+	template := r.template(data)
+	return fmt.Sprintf(`
+%s
+resource "azurerm_kusto_script" "test" {
+  name                               = "acctest-ks-%d"
+  database_id                        = azurerm_kusto_database.test.id
+  continue_on_errors_enabled         = true
+  force_an_update_when_value_changed = "first"
+  script_content                     = ".create table MyTable (Level:string, Timestamp:datetime, UserId:string, TraceId:string, Message:string, ProcessId:int32)"
+}
+`, template, data.RandomInteger)
 }

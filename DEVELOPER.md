@@ -3,6 +3,10 @@
 * [Terraform (Core)](https://www.terraform.io/downloads.html) - version 1.x (0.12.x and above are compatible however 1.x is recommended)
 * [Go](https://golang.org/doc/install) version 1.18.x (to build the provider plugin)
 
+## Contributor Guides
+
+A Collection of guides geared towards contributors can be found in the [`/contributing`](https://github.com/hashicorp/terraform-provider-azurerm/tree/main/contributing) directory of this repository.
+
 ### On Windows
 
 If you're on Windows you'll also need:
@@ -21,6 +25,10 @@ refreshenv
 ```
 
 You must run `Developing the Provider` commands in `bash` because `sh` scrips are invoked as part of these.
+
+You may hit issues with `make build` telling you every file needs to be formatted as a result of line endings. To avoid this issue set your git config using `git config --global core.autocrlf false`. This will tell git to use the source `LF` rather than the Windows default of `CRLF`.
+
+You may get errors when cloning the repository on Windows that end with `Filename too long`. To avoid this issue set your git config using `git config --system core.longpaths true`. This will tell git to allow file names longer than 260 characters which is the default on Windows.
 
 ## Developing the Provider
 

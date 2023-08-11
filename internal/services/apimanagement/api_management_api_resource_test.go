@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package apimanagement_test
 
 import (
@@ -8,12 +11,18 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/apimanagement/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
 
 type ApiManagementApiResource struct{}
+
+const (
+	SkuNameConsumption = "Consumption_0"
+	SkuNameDeveloper   = "Developer_1"
+)
 
 func TestAccApiManagementApi_basic(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
@@ -24,6 +33,7 @@ func TestAccApiManagementApi_basic(t *testing.T) {
 			Config: r.basic(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("http"),
 				check.That(data.ResourceName).Key("soap_pass_through").HasValue("false"),
 				check.That(data.ResourceName).Key("is_current").HasValue("true"),
 				check.That(data.ResourceName).Key("is_online").HasValue("false"),
@@ -59,6 +69,7 @@ func TestAccApiManagementApi_blankPath(t *testing.T) {
 			Config: r.blankPath(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("http"),
 				check.That(data.ResourceName).Key("soap_pass_through").HasValue("false"),
 				check.That(data.ResourceName).Key("is_current").HasValue("true"),
 				check.That(data.ResourceName).Key("is_online").HasValue("false"),
@@ -130,7 +141,58 @@ func TestAccApiManagementApi_requiresImport(t *testing.T) {
 	})
 }
 
+func TestAccApiManagementApi_graphql(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
+	r := ApiManagementApiResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.graphql(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("graphql"),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccApiManagementApi_soap(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
+	r := ApiManagementApiResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.soap(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("soap"),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccApiManagementApi_websocket(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
+	r := ApiManagementApiResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.websocket(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("websocket"),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func TestAccApiManagementApi_soapPassthrough(t *testing.T) {
+	if features.FourPointOhBeta() {
+		t.Skipf("Test does not apply on 4.0")
+	}
 	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
 	r := ApiManagementApiResource{}
 
@@ -139,6 +201,7 @@ func TestAccApiManagementApi_soapPassthrough(t *testing.T) {
 			Config: r.soapPassthrough(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("api_type").HasValue("soap"),
 			),
 		},
 		data.ImportStep(),
@@ -191,6 +254,29 @@ func TestAccApiManagementApi_importWsdl(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.importWsdl(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		{
+			ResourceName:      data.ResourceName,
+			ImportState:       true,
+			ImportStateVerify: true,
+			ImportStateVerifyIgnore: []string{
+				// not returned from the API
+				"import",
+			},
+		},
+	})
+}
+
+func TestAccApiManagementApi_importWsdlWithSelector(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
+	r := ApiManagementApiResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.importWsdlWithSelector(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -320,6 +406,21 @@ func TestAccApiManagementApi_createRevisionFromExistingRevision(t *testing.T) {
 	})
 }
 
+func TestAccApiManagementApi_contact(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_api_management_api", "test")
+	r := ApiManagementApiResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.contact(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func (ApiManagementApiResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
 	id, err := parse.ApiID(state.ID)
 	if err != nil {
@@ -347,7 +448,7 @@ resource "azurerm_api_management_api" "test" {
   protocols           = ["https"]
   revision            = "1"
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) blankPath(data acceptance.TestData) string {
@@ -363,7 +464,7 @@ resource "azurerm_api_management_api" "test" {
   protocols           = ["https"]
   revision            = "1"
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) wordRevision(data acceptance.TestData) string {
@@ -379,7 +480,59 @@ resource "azurerm_api_management_api" "test" {
   protocols           = ["https"]
   revision            = "one-point-oh"
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
+}
+
+func (r ApiManagementApiResource) graphql(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_api_management_api" "test" {
+  name                = "acctestapi-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  api_management_name = azurerm_api_management.test.name
+  api_type            = "graphql"
+  display_name        = "api1"
+  path                = "api1"
+  protocols           = ["https"]
+  revision            = "1"
+}
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
+}
+
+func (r ApiManagementApiResource) soap(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_api_management_api" "test" {
+  name                = "acctestapi-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  api_management_name = azurerm_api_management.test.name
+  api_type            = "soap"
+  display_name        = "api1"
+  path                = "api1"
+  protocols           = ["https"]
+  revision            = "1"
+}
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
+}
+
+func (r ApiManagementApiResource) websocket(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_api_management_api" "test" {
+  name                = "acctestapi-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  api_management_name = azurerm_api_management.test.name
+  api_type            = "websocket"
+  display_name        = "api1"
+  path                = "api1"
+  protocols           = ["wss"]
+  revision            = "1"
+  service_url         = "wss://example.com/foo/bar"
+}
+`, r.template(data, SkuNameDeveloper), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) soapPassthrough(data acceptance.TestData) string {
@@ -396,7 +549,7 @@ resource "azurerm_api_management_api" "test" {
   revision            = "1"
   soap_pass_through   = true
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) subscriptionRequired(data acceptance.TestData) string {
@@ -413,7 +566,7 @@ resource "azurerm_api_management_api" "test" {
   revision              = "1"
   subscription_required = false
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) requiresImport(data acceptance.TestData) string {
@@ -450,7 +603,7 @@ resource "azurerm_api_management_api" "test" {
     content_format = "swagger-json"
   }
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) importWsdl(data acceptance.TestData) string {
@@ -469,6 +622,27 @@ resource "azurerm_api_management_api" "test" {
   import {
     content_value  = file("testdata/api_management_api_wsdl.xml")
     content_format = "wsdl"
+  }
+}
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
+}
+
+func (r ApiManagementApiResource) importWsdlWithSelector(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_api_management_api" "test" {
+  name                = "acctestapi-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  api_management_name = azurerm_api_management.test.name
+  display_name        = "api1"
+  path                = "api1"
+  protocols           = ["https"]
+  revision            = "1"
+
+  import {
+    content_value  = file("testdata/api_management_api_wsdl_multiple.xml")
+    content_format = "wsdl"
 
     wsdl_selector {
       service_name  = "Calculator"
@@ -476,7 +650,7 @@ resource "azurerm_api_management_api" "test" {
     }
   }
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) complete(data acceptance.TestData) string {
@@ -498,8 +672,21 @@ resource "azurerm_api_management_api" "test" {
     header = "X-Butter-Robot-API-Key"
     query  = "location"
   }
+
+  contact {
+    email = "test@test.com"
+    name  = "test"
+    url   = "https://example:8080"
+  }
+
+  license {
+    name = "test-license"
+    url  = "https://example:8080/license"
+  }
+
+  terms_of_service_url = "https://example:8080/service"
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) versionSet(data acceptance.TestData) string {
@@ -525,7 +712,7 @@ resource "azurerm_api_management_api" "test" {
   version             = "v1"
   version_set_id      = azurerm_api_management_api_version_set.test.id
 }
-`, r.template(data), data.RandomInteger, data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger, data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) oauth2Authorization(data acceptance.TestData) string {
@@ -563,7 +750,7 @@ resource "azurerm_api_management_api" "test" {
     scope                     = "acctest"
   }
 }
-`, r.template(data), data.RandomInteger, data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger, data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) openidAuthentication(data acceptance.TestData) string {
@@ -596,7 +783,7 @@ resource "azurerm_api_management_api" "test" {
     ]
   }
 }
-`, r.template(data), data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+`, r.template(data, SkuNameConsumption), data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger)
 }
 
 func (r ApiManagementApiResource) cloneApi(data acceptance.TestData) string {
@@ -667,11 +854,52 @@ resource "azurerm_api_management_api" "revision" {
   revision             = "18"
   source_api_id        = "${azurerm_api_management_api.test.id};rev=3"
   revision_description = "Creating a Revision of an existing API"
+  contact {
+    email = "test@test.com"
+    name  = "test"
+    url   = "https://example:8080"
+  }
+
+  license {
+    name = "test-license"
+    url  = "https://example:8080/license"
+  }
+
+  terms_of_service_url = "https://example:8080/service"
 }
 `, r.complete(data), data.RandomInteger)
 }
 
-func (ApiManagementApiResource) template(data acceptance.TestData) string {
+func (r ApiManagementApiResource) contact(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_api_management_api" "test" {
+  name                = "acctestapi-%d"
+  resource_group_name = azurerm_resource_group.test.name
+  api_management_name = azurerm_api_management.test.name
+  display_name        = "api1"
+  path                = "api1"
+  protocols           = ["https"]
+  revision            = "1"
+
+  contact {
+    email = "test@test.com"
+    name  = "test"
+    url   = "https://example:8080"
+  }
+
+  license {
+    name = "test-license"
+    url  = "https://example:8080/license"
+  }
+
+  terms_of_service_url = "https://example:8080/service"
+}
+`, r.template(data, SkuNameConsumption), data.RandomInteger)
+}
+
+func (ApiManagementApiResource) template(data acceptance.TestData, skuName string) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
   features {}
@@ -689,7 +917,7 @@ resource "azurerm_api_management" "test" {
   publisher_name      = "pub1"
   publisher_email     = "pub1@email.com"
 
-  sku_name = "Consumption_0"
+  sku_name = "%s"
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, skuName)
 }

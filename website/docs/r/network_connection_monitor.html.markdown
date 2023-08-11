@@ -61,8 +61,8 @@ resource "azurerm_virtual_machine" "example" {
 
   storage_image_reference {
     publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "16.04-LTS"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts"
     version   = "latest"
   }
 
@@ -97,14 +97,13 @@ resource "azurerm_log_analytics_workspace" "example" {
   name                = "example-Workspace"
   location            = azurerm_resource_group.example.location
   resource_group_name = azurerm_resource_group.example.name
-  sku                 = "pergb2018"
+  sku                 = "PerGB2018"
 }
 
 resource "azurerm_network_connection_monitor" "example" {
-  name                 = "example-Monitor"
-  network_watcher_name = azurerm_network_watcher.example.name
-  resource_group_name  = azurerm_resource_group.example.name
-  location             = azurerm_network_watcher.example.location
+  name               = "example-Monitor"
+  network_watcher_id = azurerm_network_watcher.example.id
+  location           = azurerm_network_watcher.example.location
 
   endpoint {
     name               = "source"
@@ -140,7 +139,6 @@ resource "azurerm_network_connection_monitor" "example" {
     destination_endpoints    = ["destination"]
     source_endpoints         = ["source"]
     test_configuration_names = ["tcpName"]
-    disable                  = false
   }
 
   notes = "examplenote"
@@ -225,7 +223,7 @@ A `test_configuration` block supports the following:
 
 * `icmp_configuration` - (Optional) A `icmp_configuration` block as defined below.
 
-* `preferred_ip_version` - (Optional) The preferred IP version which is used in the test evaluation. Possible values are `IPv4` and `IPv6`. 
+* `preferred_ip_version` - (Optional) The preferred IP version which is used in the test evaluation. Possible values are `IPv4` and `IPv6`.
 
 * `success_threshold` - (Optional) A `success_threshold` block as defined below.
 
@@ -295,13 +293,13 @@ A `test_group` block supports the following:
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Network Connection Monitor.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Network Connection Monitor.
 * `read` - (Defaults to 5 minutes) Used when retrieving the Network Connection Monitor.

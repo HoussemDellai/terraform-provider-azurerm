@@ -1,12 +1,16 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/network/parse"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
@@ -14,7 +18,7 @@ import (
 )
 
 func dataSourceSubnet() *pluginsdk.Resource {
-	return &pluginsdk.Resource{
+	resource := &pluginsdk.Resource{
 		Read: dataSourceSubnetRead,
 
 		Timeouts: &pluginsdk.ResourceTimeout{
@@ -64,18 +68,31 @@ func dataSourceSubnet() *pluginsdk.Resource {
 					Type: pluginsdk.TypeString,
 				},
 			},
-
-			"enforce_private_link_endpoint_network_policies": {
+			"private_endpoint_network_policies_enabled": {
 				Type:     pluginsdk.TypeBool,
 				Computed: true,
 			},
 
-			"enforce_private_link_service_network_policies": {
+			"private_link_service_network_policies_enabled": {
 				Type:     pluginsdk.TypeBool,
 				Computed: true,
 			},
 		},
 	}
+
+	if !features.FourPointOhBeta() {
+		resource.Schema["enforce_private_link_endpoint_network_policies"] = &pluginsdk.Schema{
+			Type:     pluginsdk.TypeBool,
+			Computed: true,
+		}
+
+		resource.Schema["enforce_private_link_service_network_policies"] = &pluginsdk.Schema{
+			Type:     pluginsdk.TypeBool,
+			Computed: true,
+		}
+	}
+
+	return resource
 }
 
 func dataSourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
@@ -84,19 +101,19 @@ func dataSourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id := parse.NewSubnetID(subscriptionId, d.Get("resource_group_name").(string), d.Get("virtual_network_name").(string), d.Get("name").(string))
-	resp, err := client.Get(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name, "")
+	id := commonids.NewSubnetID(subscriptionId, d.Get("resource_group_name").(string), d.Get("virtual_network_name").(string), d.Get("name").(string))
+	resp, err := client.Get(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName, "")
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
-			return fmt.Errorf("Error: %s was not found", id)
+			return fmt.Errorf("%s was not found", id)
 		}
 		return fmt.Errorf("retrieving %s: %+v", id, err)
 	}
 
 	d.SetId(id.ID())
-	d.Set("name", id.Name)
+	d.Set("name", id.SubnetName)
 	d.Set("virtual_network_name", id.VirtualNetworkName)
-	d.Set("resource_group_name", id.ResourceGroup)
+	d.Set("resource_group_name", id.ResourceGroupName)
 
 	if props := resp.SubnetPropertiesFormat; props != nil {
 		d.Set("address_prefix", props.AddressPrefix)
@@ -110,8 +127,13 @@ func dataSourceSubnetRead(d *pluginsdk.ResourceData, meta interface{}) error {
 			d.Set("address_prefixes", utils.FlattenStringSlice(props.AddressPrefixes))
 		}
 
-		d.Set("enforce_private_link_endpoint_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
-		d.Set("enforce_private_link_service_network_policies", flattenSubnetPrivateLinkNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
+		if !features.FourPointOhBeta() {
+			d.Set("enforce_private_link_endpoint_network_policies", flattenEnforceSubnetNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
+			d.Set("enforce_private_link_service_network_policies", flattenEnforceSubnetNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
+		}
+
+		d.Set("private_endpoint_network_policies_enabled", flattenSubnetNetworkPolicy(string(props.PrivateEndpointNetworkPolicies)))
+		d.Set("private_link_service_network_policies_enabled", flattenSubnetNetworkPolicy(string(props.PrivateLinkServiceNetworkPolicies)))
 
 		networkSecurityGroupId := ""
 		if props.NetworkSecurityGroup != nil && props.NetworkSecurityGroup.ID != nil {

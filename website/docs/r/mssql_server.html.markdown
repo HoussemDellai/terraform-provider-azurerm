@@ -41,17 +41,99 @@ resource "azurerm_mssql_server" "example" {
   }
 }
 ```
+
+## Example Usage for Transparent Data Encryption(TDE) with a Customer Managed Key(CMK) during Create
+
+```hcl
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_resource_group" "example" {
+  name     = "example-resources"
+  location = "West Europe"
+}
+
+resource "azurerm_user_assigned_identity" "example" {
+  name                = "example-admin"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+}
+
+resource "azurerm_mssql_server" "example" {
+  name                         = "example-resource"
+  resource_group_name          = azurerm_resource_group.example.name
+  location                     = azurerm_resource_group.example.location
+  version                      = "12.0"
+  administrator_login          = "Example-Administrator"
+  administrator_login_password = "Example_Password!"
+  minimum_tls_version          = "1.2"
+
+  azuread_administrator {
+    login_username = azurerm_user_assigned_identity.example.name
+    object_id      = azurerm_user_assigned_identity.example.principal_id
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.example.id]
+  }
+
+  primary_user_assigned_identity_id            = azurerm_user_assigned_identity.example.id
+  transparent_data_encryption_key_vault_key_id = azurerm_key_vault_key.example.id
+}
+
+# Create a key vault with access policies which allow for the current user to get, list, create, delete, update, recover, purge and getRotationPolicy for the key vault key and also add a key vault access policy for the Microsoft Sql Server instance User Managed Identity to get, wrap, and unwrap key(s)
+resource "azurerm_key_vault" "example" {
+  name                        = "mssqltdeexample"
+  location                    = azurerm_resource_group.example.location
+  resource_group_name         = azurerm_resource_group.example.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = azurerm_user_assigned_identity.example.tenant_id
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = true
+
+  sku_name = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = ["Get", "List", "Create", "Delete", "Update", "Recover", "Purge", "GetRotationPolicy"]
+  }
+
+  access_policy {
+    tenant_id = azurerm_user_assigned_identity.example.tenant_id
+    object_id = azurerm_user_assigned_identity.example.principal_id
+
+    key_permissions = ["Get", "WrapKey", "UnwrapKey"]
+  }
+}
+
+resource "azurerm_key_vault_key" "example" {
+  depends_on = [azurerm_key_vault.example]
+
+  name         = "example-key"
+  key_vault_id = azurerm_key_vault.example.id
+  key_type     = "RSA"
+  key_size     = 2048
+
+  key_opts = ["unwrapKey", "wrapKey"]
+}
+
+```
+
 ## Argument Reference
 
 The following arguments are supported:
 
-* `name` - (Required) The name of the Microsoft SQL Server. This needs to be globally unique within Azure.
+* `name` - (Required) The name of the Microsoft SQL Server. This needs to be globally unique within Azure. Changing this forces a new resource to be created.
 
-* `resource_group_name` - (Required) The name of the resource group in which to create the Microsoft SQL Server.
+* `resource_group_name` - (Required) The name of the resource group in which to create the Microsoft SQL Server. Changing this forces a new resource to be created.
 
 * `location` - (Required) Specifies the supported Azure location where the resource exists. Changing this forces a new resource to be created.
 
-* `version` - (Required) The version for the new server. Valid values are: 2.0 (for v11 server) and 12.0 (for v12 server).
+* `version` - (Required) The version for the new server. Valid values are: 2.0 (for v11 server) and 12.0 (for v12 server). Changing this forces a new resource to be created.
+
+---
 
 * `administrator_login` - (Optional) The administrator login name for the new server. Required unless `azuread_authentication_only` in the `azuread_administrator` block is `true`. When omitted, Azure will generate a default username which cannot be subsequently changed. Changing this forces a new resource to be created.
 
@@ -63,15 +145,25 @@ The following arguments are supported:
 
 * `identity` - (Optional) An `identity` block as defined below.
 
-* `minimum_tls_version` - (Optional) The Minimum TLS Version for all SQL Database and SQL Data Warehouse databases associated with the server. Valid values are: `1.0`, `1.1` and `1.2`.
+* `transparent_data_encryption_key_vault_key_id` - (Optional) The fully versioned `Key Vault` `Key` URL (e.g. `'https://<YourVaultName>.vault.azure.net/keys/<YourKeyName>/<YourKeyVersion>`) to be used as the `Customer Managed Key`(CMK/BYOK) for the `Transparent Data Encryption`(TDE) layer.
 
-~> **NOTE:** Once `minimum_tls_version` is set it is not possible to remove this setting and must be given a valid value for any further updates to the resource.
+~> **NOTE:**  To use `transparent_data_encryption_key_vault_key_id` a User Assigned identity must be specified in `primary_user_assigned_identity_id`. System Assigned Identities are not supported.
+
+~> **NOTE:** To successfully deploy a `Microsoft SQL Server` in CMK/BYOK TDE the `Key Vault` must have `Soft-delete` and `purge protection` enabled to protect from data loss due to accidental key and/or key vault deletion. The `Key Vault` and the `Microsoft SQL Server` `User Managed Identity Instance` must belong to the same `Azure Active Directory` `tenant`. 
+
+~> **NOTE:**  Cross-tenant `Key Vault` and `Microsoft SQL Server` interactions are not supported. Please see the [product documentation](https://learn.microsoft.com/azure/azure-sql/database/transparent-data-encryption-byok-overview?view=azuresql#requirements-for-configuring-customer-managed-tde) for more information. 
+
+~> **NOTE:** When using a firewall with a `Key Vault`, you must enable the option `Allow trusted Microsoft services to bypass the firewall`.
+
+* `minimum_tls_version` - (Optional) The Minimum TLS Version for all SQL Database and SQL Data Warehouse databases associated with the server. Valid values are: `1.0`, `1.1` , `1.2` and `Disabled`. Defaults to `1.2`.
+
+~> **NOTE:** The `minimum_tls_version` is set to `Disabled` means all TLS versions are allowed. After you enforce a version of `minimum_tls_version`, it's not possible to revert to `Disabled`.
 
 * `public_network_access_enabled` - (Optional) Whether public network access is allowed for this server. Defaults to `true`.
 
 * `outbound_network_restriction_enabled` - (Optional) Whether outbound network traffic is restricted for this server. Defaults to `false`.
 
-* `primary_user_assigned_identity_id` - (Optional) Specifies the primary user managed identity id. Required if `type` is `UserAssigned` and should be combined with `user_assigned_identity_ids`.
+* `primary_user_assigned_identity_id` - (Optional) Specifies the primary user managed identity id. Required if `type` is `UserAssigned` and should be combined with `identity_ids`.
 
 * `tags` - (Optional) A mapping of tags to assign to the resource.
 
@@ -79,9 +171,9 @@ The following arguments are supported:
 
 An `identity` block supports the following:
 
-* `type` - (Required) Specifies the type of Managed Service Identity that should be configured on this API Management Service. Possible values are `SystemAssigned`, `UserAssigned`.
+* `type` - (Required) Specifies the type of Managed Service Identity that should be configured on this SQL Server. Possible values are `SystemAssigned`, `UserAssigned`, `SystemAssigned, UserAssigned` (to enable both).
 
-* `identity_ids` - (Optional) Specifies a list of User Assigned Managed Identity IDs to be assigned to this API Management Service.
+* `identity_ids` - (Optional) Specifies a list of User Assigned Managed Identity IDs to be assigned to this SQL Server.
 
 ~> **NOTE:** This is required when `type` is set to `UserAssigned`
 
@@ -91,17 +183,17 @@ An `identity` block supports the following:
 
 An `azuread_administrator` block supports the following:
 
-* `login_username` - (Required)  The login username of the Azure AD Administrator of this SQL Server.
+* `login_username` - (Required) The login username of the Azure AD Administrator of this SQL Server.
 
 * `object_id` - (Required) The object id of the Azure AD Administrator of this SQL Server.
 
 * `tenant_id` - (Optional) The tenant id of the Azure AD Administrator of this SQL Server.
 
-* `azuread_authentication_only` - (Optional) Specifies whether only AD Users and administrators (like `azuread_administrator.0.login_username`) can be used to login, or also local database users (like `administrator_login`). When `true`, the `administrator_login` and `administrator_login_password` properties can be omitted.
+* `azuread_authentication_only` - (Optional) Specifies whether only AD Users and administrators (e.g. `azuread_administrator.0.login_username`) can be used to login, or also local database users (e.g. `administrator_login`). When `true`, the `administrator_login` and `administrator_login_password` properties can be omitted.
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - the Microsoft SQL Server ID.
 
@@ -111,7 +203,7 @@ The following attributes are exported:
 
 ---
 
-`identity` exports the following:
+A `identity` block exports the following:
 
 * `principal_id` - The Principal ID for the Service Principal associated with the Identity of this SQL Server.
 
@@ -121,7 +213,7 @@ The following attributes are exported:
 
 ### Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 60 minutes) Used when creating the Microsoft SQL Server.
 * `update` - (Defaults to 60 minutes) Used when updating the Microsoft SQL Server.

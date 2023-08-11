@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package mssql
 
 import (
@@ -7,8 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql" // nolint: staticcheck
 	"github.com/gofrs/uuid"
+	"github.com/hashicorp/go-azure-helpers/lang/pointer"
 	"github.com/hashicorp/go-azure-helpers/lang/response"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
@@ -16,7 +20,8 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	msivalidate "github.com/hashicorp/terraform-provider-azurerm/internal/services/msi/validate"
+	keyVaultParser "github.com/hashicorp/terraform-provider-azurerm/internal/services/keyvault/parse"
+	keyVaultValidate "github.com/hashicorp/terraform-provider-azurerm/internal/services/keyvault/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
@@ -53,9 +58,9 @@ func resourceMsSqlServer() *pluginsdk.Resource {
 				ValidateFunc: validate.ValidateMsSqlServerName,
 			},
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"version": {
 				Type:     pluginsdk.TypeString,
@@ -130,15 +135,21 @@ func resourceMsSqlServer() *pluginsdk.Resource {
 				}, false),
 			},
 
-			"identity": commonschema.SystemOrUserAssignedIdentityOptional(),
+			"identity": commonschema.SystemAssignedUserAssignedIdentityOptional(),
+
+			"transparent_data_encryption_key_vault_key_id": {
+				Type:         pluginsdk.TypeString,
+				Optional:     true,
+				ValidateFunc: keyVaultValidate.NestedItemId,
+			},
 
 			"primary_user_assigned_identity_id": {
 				Type:         pluginsdk.TypeString,
 				Optional:     true,
 				Computed:     true,
-				ValidateFunc: msivalidate.UserAssignedIdentityID,
+				ValidateFunc: commonids.ValidateUserAssignedIdentityID,
 				RequiredWith: []string{
-					"identity.0.identity_ids",
+					"identity",
 				},
 			},
 
@@ -150,6 +161,7 @@ func resourceMsSqlServer() *pluginsdk.Resource {
 					"1.0",
 					"1.1",
 					"1.2",
+					"Disabled",
 				}, false),
 			},
 
@@ -245,8 +257,29 @@ func resourceMsSqlServerCreate(d *pluginsdk.ResourceData, meta interface{}) erro
 		props.Identity = expandedIdentity
 	}
 
+	if v, ok := d.GetOk("transparent_data_encryption_key_vault_key_id"); ok {
+		keyVaultKeyId := v.(string)
+
+		keyId, err := keyVaultParser.ParseNestedItemID(keyVaultKeyId)
+		if err != nil {
+			return fmt.Errorf("unable to parse key: %q: %+v", keyVaultKeyId, err)
+		}
+
+		if keyId.NestedItemType == keyVaultParser.NestedItemTypeKey {
+			// msSql requires the versioned key URL...
+			props.KeyID = pointer.To(keyId.ID())
+		} else {
+			return fmt.Errorf("key vault key id must be a reference to a key, got %s", keyId.NestedItemType)
+		}
+	}
+
 	if primaryUserAssignedIdentityID, ok := d.GetOk("primary_user_assigned_identity_id"); ok {
 		props.PrimaryUserAssignedIdentityID = utils.String(primaryUserAssignedIdentityID.(string))
+	}
+
+	// if you pass the Key ID you must also define the PrimaryUserAssignedIdentityID...
+	if props.KeyID != nil && props.PrimaryUserAssignedIdentityID == nil {
+		return fmt.Errorf("the `primary_user_assigned_identity_id` field must be specified to use the 'transparent_data_encryption_key_vault_key_id' in %s", id)
 	}
 
 	if v := d.Get("public_network_access_enabled"); !v.(bool) {
@@ -257,7 +290,7 @@ func resourceMsSqlServerCreate(d *pluginsdk.ResourceData, meta interface{}) erro
 		props.ServerProperties.RestrictOutboundNetworkAccess = sql.ServerNetworkAccessFlagEnabled
 	}
 
-	if v := d.Get("minimum_tls_version"); v.(string) != "" {
+	if v := d.Get("minimum_tls_version"); v.(string) != "Disabled" {
 		props.ServerProperties.MinimalTLSVersion = utils.String(v.(string))
 	}
 
@@ -293,11 +326,16 @@ func resourceMsSqlServerUpdate(d *pluginsdk.ResourceData, meta interface{}) erro
 	subscriptionId := meta.(*clients.Client).Account.SubscriptionId
 	connectionClient := meta.(*clients.Client).MSSQL.ServerConnectionPoliciesClient
 	adminClient := meta.(*clients.Client).MSSQL.ServerAzureADAdministratorsClient
-	aadOnlyAuthentictionsClient := meta.(*clients.Client).MSSQL.ServerAzureADOnlyAuthenticationsClient
+	aadOnlyAuthenticationsClient := meta.(*clients.Client).MSSQL.ServerAzureADOnlyAuthenticationsClient
 	ctx, cancel := timeouts.ForUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
 	id := parse.NewServerID(subscriptionId, d.Get("resource_group_name").(string), d.Get("name").(string))
+
+	existing, err := client.Get(ctx, id.ResourceGroup, id.Name, "")
+	if err != nil {
+		return fmt.Errorf("retrieving %s: %+v", id, err)
+	}
 
 	location := azure.NormalizeLocation(d.Get("location").(string))
 	version := d.Get("version").(string)
@@ -321,10 +359,32 @@ func resourceMsSqlServerUpdate(d *pluginsdk.ResourceData, meta interface{}) erro
 			return fmt.Errorf("expanding `identity`: %+v", err)
 		}
 		props.Identity = expandedIdentity
+	} else {
+		props.Identity = existing.Identity
+	}
+
+	if d.HasChange("key_vault_key_id") {
+		keyVaultKeyId := d.Get(("transparent_data_encryption_key_vault_key_id")).(string)
+
+		keyId, err := keyVaultParser.ParseNestedItemID(keyVaultKeyId)
+		if err != nil {
+			return fmt.Errorf("unable to parse key: %q: %+v", keyVaultKeyId, err)
+		}
+
+		if keyId.NestedItemType == keyVaultParser.NestedItemTypeKey {
+			props.KeyID = pointer.To(keyId.ID())
+		} else {
+			return fmt.Errorf("key vault key id must be a reference to a key, got %s", keyId.NestedItemType)
+		}
 	}
 
 	if primaryUserAssignedIdentityID, ok := d.GetOk("primary_user_assigned_identity_id"); ok {
 		props.PrimaryUserAssignedIdentityID = utils.String(primaryUserAssignedIdentityID.(string))
+	}
+
+	// if you pass the Key ID you must also define the PrimaryUserAssignedIdentityID...
+	if props.KeyID != nil && props.PrimaryUserAssignedIdentityID == nil {
+		return fmt.Errorf("the `primary_user_assigned_identity_id` field must be specified to use the 'transparent_data_encryption_key_vault_key_id' in %s", id)
 	}
 
 	if v := d.Get("public_network_access_enabled"); !v.(bool) {
@@ -340,7 +400,7 @@ func resourceMsSqlServerUpdate(d *pluginsdk.ResourceData, meta interface{}) erro
 		props.ServerProperties.AdministratorLoginPassword = utils.String(adminPassword)
 	}
 
-	if v := d.Get("minimum_tls_version"); v.(string) != "" {
+	if v := d.Get("minimum_tls_version"); v.(string) != "Disabled" {
 		props.ServerProperties.MinimalTLSVersion = utils.String(v.(string))
 	}
 
@@ -360,7 +420,7 @@ func resourceMsSqlServerUpdate(d *pluginsdk.ResourceData, meta interface{}) erro
 	d.SetId(id.ID())
 
 	if d.HasChange("azuread_administrator") {
-		aadOnlyDeleteFuture, err := aadOnlyAuthentictionsClient.Delete(ctx, id.ResourceGroup, id.Name)
+		aadOnlyDeleteFuture, err := aadOnlyAuthenticationsClient.Delete(ctx, id.ResourceGroup, id.Name)
 		if err != nil {
 			if aadOnlyDeleteFuture.Response() == nil || aadOnlyDeleteFuture.Response().StatusCode != http.StatusBadRequest {
 				return fmt.Errorf("deleting AD Only Authentications %s: %+v", id.String(), err)
@@ -397,7 +457,7 @@ func resourceMsSqlServerUpdate(d *pluginsdk.ResourceData, meta interface{}) erro
 				AzureADOnlyAuthentication: utils.Bool(aadOnlyAuthentictionsEnabled),
 			},
 		}
-		aadOnlyEnabledFuture, err := aadOnlyAuthentictionsClient.CreateOrUpdate(ctx, id.ResourceGroup, id.Name, aadOnlyAuthentictionsParams)
+		aadOnlyEnabledFuture, err := aadOnlyAuthenticationsClient.CreateOrUpdate(ctx, id.ResourceGroup, id.Name, aadOnlyAuthentictionsParams)
 		if err != nil {
 			return fmt.Errorf("setting AAD only authentication for %s: %+v", id.String(), err)
 		}
@@ -460,7 +520,12 @@ func resourceMsSqlServerRead(d *pluginsdk.ResourceData, meta interface{}) error 
 		d.Set("version", props.Version)
 		d.Set("administrator_login", props.AdministratorLogin)
 		d.Set("fully_qualified_domain_name", props.FullyQualifiedDomainName)
-		d.Set("minimum_tls_version", props.MinimalTLSVersion)
+		// todo remove `|| *v == "None"` when https://github.com/Azure/azure-rest-api-specs/issues/24348 is addressed
+		if v := props.MinimalTLSVersion; v == nil || *v == "None" {
+			d.Set("minimum_tls_version", "Disabled")
+		} else {
+			d.Set("minimum_tls_version", props.MinimalTLSVersion)
+		}
 		d.Set("public_network_access_enabled", props.PublicNetworkAccess == sql.ServerNetworkAccessFlagEnabled)
 		d.Set("outbound_network_restriction_enabled", props.RestrictOutboundNetworkAccess == sql.ServerNetworkAccessFlagEnabled)
 		primaryUserAssignedIdentityID := ""
@@ -472,6 +537,7 @@ func resourceMsSqlServerRead(d *pluginsdk.ResourceData, meta interface{}) error 
 			primaryUserAssignedIdentityID = parsedPrimaryUserAssignedIdentityID.ID()
 		}
 		d.Set("primary_user_assigned_identity_id", primaryUserAssignedIdentityID)
+		d.Set("transparent_data_encryption_key_vault_key_id", props.KeyID)
 		if props.Administrators != nil {
 			d.Set("azuread_administrator", flatternMsSqlServerAdministrators(*props.Administrators))
 		}
@@ -516,7 +582,7 @@ func resourceMsSqlServerDelete(d *pluginsdk.ResourceData, meta interface{}) erro
 }
 
 func expandSqlServerIdentity(input []interface{}) (*sql.ResourceIdentity, error) {
-	expanded, err := identity.ExpandSystemOrUserAssignedMap(input)
+	expanded, err := identity.ExpandSystemAndUserAssignedMap(input)
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +590,7 @@ func expandSqlServerIdentity(input []interface{}) (*sql.ResourceIdentity, error)
 	out := sql.ResourceIdentity{
 		Type: sql.IdentityType(string(expanded.Type)),
 	}
-	if expanded.Type == identity.TypeUserAssigned {
+	if expanded.Type == identity.TypeUserAssigned || expanded.Type == identity.TypeSystemAssignedUserAssigned {
 		out.UserAssignedIdentities = make(map[string]*sql.UserIdentity)
 		for k := range expanded.IdentityIds {
 			out.UserAssignedIdentities[k] = &sql.UserIdentity{
@@ -537,10 +603,10 @@ func expandSqlServerIdentity(input []interface{}) (*sql.ResourceIdentity, error)
 }
 
 func flattenSqlServerIdentity(input *sql.ResourceIdentity) (*[]interface{}, error) {
-	var transform *identity.SystemOrUserAssignedMap
+	var transform *identity.SystemAndUserAssignedMap
 
 	if input != nil {
-		transform = &identity.SystemOrUserAssignedMap{
+		transform = &identity.SystemAndUserAssignedMap{
 			Type:        identity.Type(string(input.Type)),
 			IdentityIds: make(map[string]identity.UserAssignedIdentityDetails),
 		}
@@ -550,21 +616,19 @@ func flattenSqlServerIdentity(input *sql.ResourceIdentity) (*[]interface{}, erro
 		if input.TenantID != nil {
 			transform.TenantId = input.TenantID.String()
 		}
-		if input.UserAssignedIdentities != nil {
-			for k, v := range input.UserAssignedIdentities {
-				details := identity.UserAssignedIdentityDetails{}
-				if v.ClientID != nil {
-					details.ClientId = utils.String(v.ClientID.String())
-				}
-				if v.PrincipalID != nil {
-					details.PrincipalId = utils.String(v.PrincipalID.String())
-				}
-				transform.IdentityIds[k] = details
+		for k, v := range input.UserAssignedIdentities {
+			details := identity.UserAssignedIdentityDetails{}
+			if v.ClientID != nil {
+				details.ClientId = utils.String(v.ClientID.String())
 			}
+			if v.PrincipalID != nil {
+				details.PrincipalId = utils.String(v.PrincipalID.String())
+			}
+			transform.IdentityIds[k] = details
 		}
 	}
 
-	return identity.FlattenSystemOrUserAssignedMap(transform)
+	return identity.FlattenSystemAndUserAssignedMap(transform)
 }
 
 func expandMsSqlServerAADOnlyAuthentictions(input []interface{}) bool {
@@ -675,7 +739,8 @@ func flattenSqlServerRestorableDatabases(resp sql.RestorableDroppedDatabaseListR
 
 func msSqlMinimumTLSVersionDiff(ctx context.Context, d *pluginsdk.ResourceDiff, _ interface{}) (err error) {
 	old, new := d.GetChange("minimum_tls_version")
-	if old != "" && new == "" {
+	// todo remove `old != "None"` when https://github.com/Azure/azure-rest-api-specs/issues/24348 is addressed
+	if old != "" && old != "None" && old != "Disabled" && new == "Disabled" {
 		err = fmt.Errorf("`minimum_tls_version` cannot be removed once set, please set a valid value for this property")
 	}
 	return

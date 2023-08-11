@@ -1,9 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/edgezones"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/network/2022-07-01/network"
 )
 
 func expandEdgeZone(input string) *network.ExtendedLocation {
@@ -23,4 +26,22 @@ func flattenEdgeZone(input *network.ExtendedLocation) string {
 		return ""
 	}
 	return edgezones.NormalizeNilable(input.Name)
+}
+
+func expandEdgeZoneModel(input string) *edgezones.Model {
+	normalized := edgezones.Normalize(input)
+	if normalized == "" {
+		return nil
+	}
+
+	return &edgezones.Model{
+		Name: normalized,
+	}
+}
+
+func flattenEdgeZoneModel(input *edgezones.Model) string {
+	if input == nil || input.Name == "" {
+		return ""
+	}
+	return edgezones.Normalize(input.Name)
 }

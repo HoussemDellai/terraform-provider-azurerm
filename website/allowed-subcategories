@@ -6,9 +6,12 @@ Analysis Services
 App Configuration
 App Service (Web Apps)
 Application Insights
+ArcKubernetes
 Attestation
 Authorization
+Automanage
 Automation
+Azure Managed Lustre File System
 Azure Stack HCI
 Base
 Batch
@@ -23,10 +26,12 @@ Confidential Ledger
 Connections
 Consumption
 Container
+Container Apps
 CosmosDB (DocumentDB)
 Cost Management
 Custom Providers
 DNS
+Dashboard
 Data Explorer
 Data Factory
 Data Share
@@ -35,17 +40,22 @@ Database
 Database Migration
 Databox Edge
 Databricks
+Datadog
 Desktop Virtualization
 Dev Test
 Digital Twins
 Disks
 Elastic
+Fluid Relay
+Graph Services
 HDInsight
 Hardware Security Module
 Healthcare
+Hybrid Compute
 IoT Central
 IoT Hub
 Key Vault
+Lab Service
 Lighthouse
 Load Balancer
 Load Test
@@ -60,13 +70,20 @@ Maps
 Media
 Messaging
 Mixed Reality
+Mobile Network
 Monitor
 NetApp
 Network
+Network Function
+New Relic
+Nginx
+Orbital
+Palo Alto
 Policy
 Portal
 PowerBI
 Private DNS
+Private DNS Resolver
 Purview
 Recovery Services
 Redis
@@ -78,10 +95,12 @@ Service Fabric
 Service Fabric Managed Clusters
 Spring Cloud
 Storage
+Storage Mover
 Stream Analytics
 Synapse
 Template
 Time Series Insights
 VMware (AVS)
 Video Analyzer
+Voice Services
 Web PubSub

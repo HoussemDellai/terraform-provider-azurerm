@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package netapp_test
 
 import (
@@ -35,7 +38,6 @@ data "azurerm_netapp_snapshot_policy" "test" {
   name                = azurerm_netapp_snapshot_policy.test.name
   resource_group_name = azurerm_netapp_snapshot_policy.test.resource_group_name
   account_name        = azurerm_netapp_snapshot_policy.test.account_name
-  enabled             = azurerm_netapp_snapshot_policy.test.enabled
 }
 `, NetAppSnapshotPolicyResource{}.basic(data))
 }

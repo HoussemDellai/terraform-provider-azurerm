@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package keyvault_test
 
 import (
@@ -137,15 +140,4 @@ data "azurerm_key_vault" "test" {
   resource_group_name = azurerm_key_vault.test.resource_group_name
 }
 `, KeyVaultResource{}.networkAclsUpdated(data))
-}
-
-func (KeyVaultDataSource) enableSoftDelete(data acceptance.TestData) string {
-	return fmt.Sprintf(`
-%s
-
-data "azurerm_key_vault" "test" {
-  name                = azurerm_key_vault.test.name
-  resource_group_name = azurerm_key_vault.test.resource_group_name
-}
-`, KeyVaultResource{}.softDelete(data))
 }

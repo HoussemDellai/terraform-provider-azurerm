@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package containers_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/containerinstance/2023-05-01/containerinstance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/containers/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -72,6 +75,26 @@ func TestAccContainerGroup_SystemAssignedIdentityNoNetwork(t *testing.T) {
 			Config: r.SystemAssignedIdentityNoNetwork(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("zones.#").HasValue("0"),
+				check.That(data.ResourceName).Key("identity.0.type").HasValue("SystemAssigned"),
+				check.That(data.ResourceName).Key("identity.0.identity_ids.#").HasValue("0"),
+				check.That(data.ResourceName).Key("identity.0.principal_id").IsUUID(),
+			),
+		},
+		data.ImportStep("identity.0.principal_id", "ip_address_type"),
+	})
+}
+
+func TestAccContainerGroup_SystemAssignedIdentityWithZones(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_container_group", "test")
+	r := ContainerGroupResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.SystemAssignedIdentityWithZones(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("zones.#").HasValue("1"),
 				check.That(data.ResourceName).Key("identity.0.type").HasValue("SystemAssigned"),
 				check.That(data.ResourceName).Key("identity.0.identity_ids.#").HasValue("0"),
 				check.That(data.ResourceName).Key("identity.0.principal_id").IsUUID(),
@@ -94,6 +117,18 @@ func TestAccContainerGroup_UserAssignedIdentity(t *testing.T) {
 				check.That(data.ResourceName).Key("identity.0.identity_ids.#").HasValue("1"),
 				check.That(data.ResourceName).Key("identity.0.principal_id").HasValue(""),
 			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccContainerGroup_UserAssignedIdentityWithVirtualNetwork(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_container_group", "test")
+	r := ContainerGroupResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.UserAssignedIdentityWithVirtualNetwork(data),
 		},
 		data.ImportStep(),
 	})
@@ -326,6 +361,12 @@ func TestAccContainerGroup_linuxBasicTagsUpdate(t *testing.T) {
 
 func TestAccContainerGroup_linuxComplete(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_container_group", "test")
+
+	// Override locations for this test to location that has GPU SKU support:
+	// https://learn.microsoft.com/en-us/azure/container-instances/container-instances-gpu
+	data.Locations.Primary = "northeurope"
+	data.Locations.Secondary = "westeurope"
+
 	r := ContainerGroupResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
@@ -333,6 +374,7 @@ func TestAccContainerGroup_linuxComplete(t *testing.T) {
 			Config: r.linuxComplete(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("dns_name_label_reuse_policy").HasValue("Unsecure"),
 				check.That(data.ResourceName).Key("container.#").HasValue("1"),
 				check.That(data.ResourceName).Key("container.0.ports.#").HasValue("1"),
 				check.That(data.ResourceName).Key("container.0.commands.#").HasValue("3"),
@@ -400,13 +442,12 @@ func TestAccContainerGroup_virtualNetwork(t *testing.T) {
 			Config: r.virtualNetwork(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
-				acceptance.TestCheckNoResourceAttr(data.ResourceName, "dns_label_name"),
-				acceptance.TestCheckNoResourceAttr(data.ResourceName, "identity"),
+				check.That(data.ResourceName).Key("dns_label_name").DoesNotExist(),
 				check.That(data.ResourceName).Key("container.#").HasValue("1"),
 				check.That(data.ResourceName).Key("os_type").HasValue("Linux"),
 				check.That(data.ResourceName).Key("container.0.ports.#").HasValue("1"),
 				check.That(data.ResourceName).Key("ip_address_type").HasValue("Private"),
-				check.That(data.ResourceName).Key("network_profile_id").Exists(),
+				check.That(data.ResourceName).Key("subnet_ids.#").HasValue("1"),
 				check.That(data.ResourceName).Key("dns_config.#").HasValue("1"),
 			),
 		},
@@ -439,20 +480,19 @@ func TestAccContainerGroup_SystemAssignedIdentityVirtualNetwork(t *testing.T) {
 			Config: r.SystemAssignedIdentityVirtualNetwork(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
-				acceptance.TestCheckNoResourceAttr(data.ResourceName, "dns_label_name"),
-				acceptance.TestCheckNoResourceAttr(data.ResourceName, "identity"),
+				check.That(data.ResourceName).Key("dns_label_name").DoesNotExist(),
 				check.That(data.ResourceName).Key("container.#").HasValue("1"),
 				check.That(data.ResourceName).Key("os_type").HasValue("Linux"),
 				check.That(data.ResourceName).Key("container.0.ports.#").HasValue("1"),
 				check.That(data.ResourceName).Key("ip_address_type").HasValue("Private"),
-				check.That(data.ResourceName).Key("network_profile_id").Exists(),
+				check.That(data.ResourceName).Key("subnet_ids.#").HasValue("1"),
 				check.That(data.ResourceName).Key("dns_config.#").HasValue("1"),
 				check.That(data.ResourceName).Key("identity.0.type").HasValue("SystemAssigned"),
 				check.That(data.ResourceName).Key("identity.0.identity_ids.#").HasValue("0"),
 				check.That(data.ResourceName).Key("identity.0.principal_id").IsUUID(),
 			),
 		},
-		data.ImportStep("identity.0.principal_id", "network_profile_id"),
+		data.ImportStep("identity.0.principal_id"),
 	})
 }
 
@@ -621,7 +661,7 @@ func TestAccContainerGroup_withInitContainer(t *testing.T) {
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
-		data.ImportStep("ip_address_type"),
+		data.ImportStep("ip_address_type", "init_container.0.secure_environment_variables", "container.0.secure_environment_variables"),
 	})
 }
 
@@ -727,6 +767,10 @@ resource "azurerm_container_group" "test" {
         path   = "/"
         port   = 443
         scheme = "Http"
+        http_headers = {
+          h1 = "v1"
+          h2 = "v2"
+        }
       }
     }
   }
@@ -821,6 +865,44 @@ resource "azurerm_container_group" "test" {
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
 }
 
+func (ContainerGroupResource) SystemAssignedIdentityWithZones(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_container_group" "test" {
+  name                = "acctestcontainergroup-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  ip_address_type     = "None"
+  os_type             = "Linux"
+
+  container {
+    name   = "hw"
+    image  = "ubuntu:20.04"
+    cpu    = "0.5"
+    memory = "0.5"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  zones = ["1"]
+
+  tags = {
+    environment = "Testing"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
+}
+
 func (ContainerGroupResource) UserAssignedIdentity(data acceptance.TestData) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
@@ -856,6 +938,77 @@ resource "azurerm_container_group" "test" {
       protocol = "TCP"
     }
   }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.test.id]
+  }
+
+  tags = {
+    environment = "Testing"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString, data.RandomInteger)
+}
+func (ContainerGroupResource) UserAssignedIdentityWithVirtualNetwork(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%d"
+  location = "%s"
+}
+
+resource "azurerm_virtual_network" "test" {
+  name                = "testvnet"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  address_space       = ["10.1.0.0/16"]
+}
+
+resource "azurerm_subnet" "test" {
+  name                 = "testsubnet"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.1.0.0/24"]
+
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.ContainerInstance/containerGroups"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+
+  name = "acctest%s"
+}
+
+resource "azurerm_container_group" "test" {
+  name                = "acctestcontainergroup-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  ip_address_type     = "Private"
+  os_type             = "Linux"
+  container {
+    name   = "hw"
+    image  = "ubuntu:20.04"
+    cpu    = "0.5"
+    memory = "0.5"
+    ports {
+      port     = 80
+      protocol = "TCP"
+    }
+  }
+
+  subnet_ids = [azurerm_subnet.test.id]
 
   identity {
     type         = "UserAssigned"
@@ -1351,27 +1504,11 @@ resource "azurerm_subnet" "test" {
   }
 }
 
-resource "azurerm_network_profile" "test" {
-  name                = "testnetprofile"
-  location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
-
-  container_network_interface {
-    name = "testcnic"
-
-    ip_configuration {
-      name      = "testipconfig"
-      subnet_id = azurerm_subnet.test.id
-    }
-  }
-}
-
 resource "azurerm_container_group" "test" {
   name                = "acctestcontainergroup-%d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ip_address_type     = "Private"
-  network_profile_id  = azurerm_network_profile.test.id
   os_type             = "Linux"
 
   container {
@@ -1388,6 +1525,8 @@ resource "azurerm_container_group" "test" {
     options        = ["one:option", "two:option", "red:option", "blue:option"]
     search_domains = ["default.svc.cluster.local."]
   }
+
+  subnet_ids = [azurerm_subnet.test.id]
 
   tags = {
     environment = "Testing"
@@ -1430,29 +1569,15 @@ resource "azurerm_subnet" "test" {
   }
 }
 
-resource "azurerm_network_profile" "test" {
-  name                = "testnetprofile"
-  location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
-
-  container_network_interface {
-    name = "testcnic"
-
-    ip_configuration {
-      name      = "testipconfig"
-      subnet_id = azurerm_subnet.test.id
-    }
-  }
-}
-
 resource "azurerm_container_group" "test" {
   count               = %d
   name                = "acctestcontainergroup-${count.index}-%d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ip_address_type     = "Private"
-  network_profile_id  = azurerm_network_profile.test.id
   os_type             = "Linux"
+
+  subnet_ids = [azurerm_subnet.test.id]
 
   container {
     name   = "hw"
@@ -1501,27 +1626,11 @@ resource "azurerm_subnet" "test" {
   }
 }
 
-resource "azurerm_network_profile" "test" {
-  name                = "testnetprofile"
-  location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
-
-  container_network_interface {
-    name = "testcnic"
-
-    ip_configuration {
-      name      = "testipconfig"
-      subnet_id = azurerm_subnet.test.id
-    }
-  }
-}
-
 resource "azurerm_container_group" "test" {
   name                = "acctestcontainergroup-%d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ip_address_type     = "Private"
-  network_profile_id  = azurerm_network_profile.test.id
   os_type             = "Linux"
 
   container {
@@ -1533,6 +1642,8 @@ resource "azurerm_container_group" "test" {
       port = 80
     }
   }
+
+  subnet_ids = [azurerm_subnet.test.id]
 
   dns_config {
     nameservers = ["reddog.microsoft.com", "somecompany.somedomain"]
@@ -1666,6 +1777,10 @@ resource "azurerm_container_group" "test" {
         path   = "/"
         port   = 443
         scheme = "Http"
+        http_headers = {
+          h1 = "v1"
+          h2 = "v2"
+        }
       }
 
       initial_delay_seconds = 1
@@ -1745,13 +1860,14 @@ resource "azurerm_storage_share" "test" {
 }
 
 resource "azurerm_container_group" "test" {
-  name                = "acctestcontainergroup-%d"
-  location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
-  ip_address_type     = "Public"
-  dns_name_label      = "acctestcontainergroup-%d"
-  os_type             = "Linux"
-  restart_policy      = "OnFailure"
+  name                        = "acctestcontainergroup-%d"
+  location                    = azurerm_resource_group.test.location
+  resource_group_name         = azurerm_resource_group.test.name
+  ip_address_type             = "Public"
+  dns_name_label              = "acctestcontainergroup-%d"
+  dns_name_label_reuse_policy = "Unsecure"
+  os_type                     = "Linux"
+  restart_policy              = "OnFailure"
 
   container {
     name   = "hf"
@@ -1768,6 +1884,15 @@ resource "azurerm_container_group" "test" {
       count = 1
       sku   = "K80"
     }
+
+    cpu_limit    = "1"
+    memory_limit = "1.5"
+
+    gpu_limit {
+      count = 1
+      sku   = "K80"
+    }
+
 
     volume {
       name       = "logs"
@@ -1803,6 +1928,10 @@ resource "azurerm_container_group" "test" {
         path   = "/"
         port   = 443
         scheme = "Http"
+        http_headers = {
+          h1 = "v1"
+          h2 = "v2"
+        }
       }
 
       initial_delay_seconds = 1
@@ -2110,6 +2239,9 @@ resource "azurerm_container_group" "test" {
     name     = "init"
     image    = "busybox"
     commands = ["echo", "hello from init"]
+    secure_environment_variables = {
+      PASSWORD = "something_very_secure_for_init"
+    }
   }
 
   container {
@@ -2119,6 +2251,9 @@ resource "azurerm_container_group" "test" {
     memory = "1.5"
 
     commands = ["echo", "hello from ubuntu"]
+    secure_environment_variables = {
+      PASSWORD = "something_very_secure"
+    }
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
@@ -2171,17 +2306,21 @@ resource "azurerm_container_group" "test" {
 }
 
 func (t ContainerGroupResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.ContainerGroupID(state.ID)
+	id, err := containerinstance.ParseContainerGroupID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Containers.GroupsClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.Containers.ContainerInstanceClient.ContainerGroupsGet(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("reading Container Group (%s): %+v", id.String(), err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	if resp.Model == nil {
+		return nil, fmt.Errorf("unexpected nil model of %q", id)
+	}
+
+	return utils.Bool(resp.Model.Id != nil), nil
 }
 
 func (ContainerGroupResource) withPrivateEmpty(data acceptance.TestData) string {
@@ -2258,6 +2397,7 @@ resource "azurerm_key_vault_access_policy" "terraform" {
     "List",
     "Purge",
     "Update",
+    "GetRotationPolicy",
   ]
 
   secret_permissions = [
@@ -2295,7 +2435,8 @@ resource "azurerm_key_vault_access_policy" "test" {
   key_permissions = [
     "Get",
     "UnwrapKey",
-    "WrapKey"
+    "WrapKey",
+    "GetRotationPolicy",
   ]
 
   tenant_id  = data.azurerm_client_config.current.tenant_id

@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 provider "azurerm" {
   features {}
 }
@@ -70,6 +73,11 @@ resource "azurerm_network_security_group" "webserver" {
     destination_port_range     = "443"
     destination_address_prefix = azurerm_subnet.internal.address_prefix
   }
+}
+
+resource "azurerm_subnet_network_security_group_association" "example" {
+  subnet_id                 = azurerm_subnet.internal.id
+  network_security_group_id = azurerm_network_security_group.webserver.id
 }
 
 resource "azurerm_lb" "example" {

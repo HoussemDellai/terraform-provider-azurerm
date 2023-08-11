@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package analysisservices_test
 
 import (
@@ -6,11 +9,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/analysisservices/2017-08-01/servers"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/analysisservices/sdk/2017-08-01/servers"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -126,7 +130,7 @@ func TestAccAzureRMAnalysisServicesServer_adminUsers(t *testing.T) {
 	const ArmAccAdminEmail2 = "ARM_ACCTEST_ADMIN_EMAIL2"
 
 	if os.Getenv(ArmAccAdminEmail1) == "" || os.Getenv(ArmAccAdminEmail2) == "" {
-		t.Skip(fmt.Sprintf("Acceptance test skipped unless env '%s' and '%s' set", ArmAccAdminEmail1, ArmAccAdminEmail2))
+		t.Skipf("Acceptance test skipped unless env '%s' and '%s' set", ArmAccAdminEmail1, ArmAccAdminEmail2)
 		return
 	}
 
@@ -502,7 +506,7 @@ func (t AnalysisServicesServerResource) Exists(ctx context.Context, clients *cli
 		return nil, err
 	}
 
-	resp, err := clients.AnalysisServices.ServerClient.GetDetails(ctx, *id)
+	resp, err := clients.AnalysisServices.Servers.GetDetails(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving %s: %+v", *id, err)
 	}
@@ -511,14 +515,17 @@ func (t AnalysisServicesServerResource) Exists(ctx context.Context, clients *cli
 }
 
 func (t AnalysisServicesServerResource) suspend(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) error {
-	client := clients.AnalysisServices.ServerClient
+	client := clients.AnalysisServices.Servers
 
 	id, err := servers.ParseServerID(state.ID)
 	if err != nil {
 		return err
 	}
 
-	if err := client.SuspendThenPoll(ctx, *id); err != nil {
+	timeout, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
+	if err := client.SuspendThenPoll(timeout, *id); err != nil {
 		return fmt.Errorf("suspending %s: %+v", *id, err)
 	}
 
@@ -527,14 +534,17 @@ func (t AnalysisServicesServerResource) suspend(ctx context.Context, clients *cl
 
 func (t AnalysisServicesServerResource) checkState(expectedState servers.State) acceptance.ClientCheckFunc {
 	return func(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) error {
-		client := clients.AnalysisServices.ServerClient
+		client := clients.AnalysisServices.Servers
 
 		id, err := servers.ParseServerID(state.ID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := client.GetDetails(ctx, *id)
+		timeout, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+
+		resp, err := client.GetDetails(timeout, *id)
 		if err != nil {
 			return fmt.Errorf("retrieving %s to check the state: %+v", *id, err)
 		}

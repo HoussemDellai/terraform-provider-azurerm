@@ -36,52 +36,33 @@ resource "azurerm_storage_account" "example" {
 resource "azurerm_monitor_aad_diagnostic_setting" "example" {
   name               = "setting1"
   storage_account_id = azurerm_storage_account.example.id
-  log {
+  enabled_log {
     category = "SignInLogs"
-    enabled  = true
     retention_policy {
       enabled = true
       days    = 1
     }
   }
-  log {
+  enabled_log {
     category = "AuditLogs"
-    enabled  = true
     retention_policy {
       enabled = true
       days    = 1
     }
   }
-  log {
+  enabled_log {
     category = "NonInteractiveUserSignInLogs"
-    enabled  = true
     retention_policy {
       enabled = true
       days    = 1
     }
   }
-  log {
+  enabled_log {
     category = "ServicePrincipalSignInLogs"
-    enabled  = true
     retention_policy {
       enabled = true
       days    = 1
     }
-  }
-  log {
-    category = "ManagedIdentitySignInLogs"
-    enabled  = false
-    retention_policy {}
-  }
-  log {
-    category = "ProvisioningLogs"
-    enabled  = false
-    retention_policy {}
-  }
-  log {
-    category = "ADFSSignInLogs"
-    enabled  = false
-    retention_policy {}
   }
 }
 ```
@@ -92,9 +73,13 @@ The following arguments are supported:
 
 * `name` - (Required) The name which should be used for this Monitor Azure Active Directory Diagnostic Setting. Changing this forces a new Monitor Azure Active Directory Diagnostic Setting to be created.
   
-* `log` - (Required) One or more `log` blocks as defined below.
+* `log` - (Optional) One or more `log` blocks as defined below.
 
-~> **Note:** At least one of the `log` blocks must have the `enabled` property set to `true`.
+-> **NOTE:** `log` is deprecated in favour of the `enabled_log` property and will be removed in version 4.0 of the AzureRM Provider.
+
+* `enabled_log` - (Optional) One or more `enabled_log` blocks as defined below.
+
+-> **NOTE:** At least one `log` or `enabled_log` block must be specified. At least one type of Log must be enabled.
 
 ---
 
@@ -119,6 +104,14 @@ A `log` block supports the following:
 * `retention_policy` - (Required) A `retention_policy` block as defined below.
 
 * `enabled` - (Optional) Is this Diagnostic Log enabled? Defaults to `true`.
+ 
+---
+
+A `enabled_log` block supports the following:
+
+* `category` - (Required) The log category for the Azure Active Directory Diagnostic.
+
+* `retention_policy` - (Required) A `retention_policy` block as defined below.
 
 ---
 
@@ -130,13 +123,13 @@ A `retention_policy` block supports the following:
 
 ## Attributes Reference
 
-In addition to the Arguments listed above - the following Attributes are exported: 
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Monitor Azure Active Directory Diagnostic Setting.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 5 minutes) Used when creating the Monitor Azure Active Directory Diagnostic Setting.
 * `read` - (Defaults to 5 minutes) Used when retrieving the Monitor Azure Active Directory Diagnostic Setting.

@@ -1,8 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consumption
 
 import (
+	"github.com/hashicorp/go-azure-sdk/resource-manager/consumption/2019-10-01/budgets"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/sdk"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/consumption/validate"
 	validateResourceGroup "github.com/hashicorp/terraform-provider-azurerm/internal/services/resource/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
@@ -48,7 +51,7 @@ func (r ResourceGroupConsumptionBudget) ResourceType() string {
 }
 
 func (r ResourceGroupConsumptionBudget) IDValidationFunc() pluginsdk.SchemaValidateFunc {
-	return validate.ConsumptionBudgetResourceGroupID
+	return budgets.ValidateScopedBudgetID
 }
 
 func (r ResourceGroupConsumptionBudget) Create() sdk.ResourceFunc {
@@ -68,5 +71,5 @@ func (r ResourceGroupConsumptionBudget) Update() sdk.ResourceFunc {
 }
 
 func (r ResourceGroupConsumptionBudget) CustomImporter() sdk.ResourceRunFunc {
-	return r.base.importerFunc("resource_group")
+	return r.base.importerFunc()
 }

@@ -29,7 +29,7 @@ resource "azurerm_resource_group" "example" {
 }
 
 resource "azurerm_managed_application_definition" "example" {
-  name                = "example-managedapplicationdefinition"
+  name                = "examplemanagedapplicationdefinition"
   location            = azurerm_resource_group.example.location
   resource_group_name = azurerm_resource_group.example.name
   lock_level          = "ReadOnly"
@@ -51,11 +51,17 @@ resource "azurerm_managed_application" "example" {
   managed_resource_group_name = "infrastructureGroup"
   application_definition_id   = azurerm_managed_application_definition.example.id
 
-  parameters = {
-    location                 = azurerm_resource_group.example.location
-    storageAccountNamePrefix = "storeNamePrefix"
-    storageAccountType       = "Standard_LRS"
-  }
+  parameter_values = jsonencode({
+    location = {
+      value = azurerm_resource_group.example.location
+    },
+    storageAccountNamePrefix = {
+      value = "storeNamePrefix"
+    },
+    storageAccountType = {
+      value = "Standard_LRS"
+    }
+  })
 }
 ```
 
@@ -63,7 +69,7 @@ resource "azurerm_managed_application" "example" {
 
 The following arguments are supported:
 
-* `name` - (Required) Specifies the name of the Managed Application. Changing this forces a new resource to be created.
+* `name` - (Required) Specifies the name of the Managed Application. Changing this forces a new resource to be created. 
 
 * `resource_group_name` - (Required) The name of the Resource Group where the Managed Application should exist. Changing this forces a new resource to be created.
 
@@ -77,9 +83,11 @@ The following arguments are supported:
 
 * `parameters` - (Optional) A mapping of name and value pairs to pass to the managed application as parameters.
 
+~> **NOTE:** `parameters` only supports values with `string` or `secureString` type and will be deprecated in version 4.0 of the provider - please use `parameter_values` instead which supports more parameter types.
+
 * `parameter_values` - (Optional) The parameter values to pass to the Managed Application. This field is a JSON object that allows you to assign parameters to this Managed Application.
 
-* `plan` - (Optional) One `plan` block as defined below.
+* `plan` - (Optional) One `plan` block as defined below. Changing this forces a new resource to be created.
 
 * `tags` - (Optional) A mapping of tags to assign to the resource.
 
@@ -87,21 +95,21 @@ The following arguments are supported:
 
 The `plan` block exports the following:
 
-* `name` - (Required) Specifies the name of the plan from the marketplace.
+* `name` - (Required) Specifies the name of the plan from the marketplace. Changing this forces a new resource to be created.
 
-* `product` - (Required) Specifies the product of the plan from the marketplace.
+* `product` - (Required) Specifies the product of the plan from the marketplace. Changing this forces a new resource to be created.
 
-* `publisher` - (Required) Specifies the publisher of the plan.
+* `publisher` - (Required) Specifies the publisher of the plan. Changing this forces a new resource to be created.
 
-* `version` - (Required) Specifies the version of the plan from the marketplace.
+* `version` - (Required) Specifies the version of the plan from the marketplace. Changing this forces a new resource to be created.
 
-* `promotion_code` - (Optional) Specifies the promotion code to use with the plan.
+* `promotion_code` - (Optional) Specifies the promotion code to use with the plan. Changing this forces a new resource to be created.
 
 ~> **NOTE:** When `plan` is specified, legal terms must be accepted for this item on this subscription before creating the Managed Application. The `azurerm_marketplace_agreement` resource or AZ CLI tool can be used to do this.
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Managed Application.
 
@@ -109,7 +117,7 @@ The following attributes are exported:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Managed Application.
 * `update` - (Defaults to 30 minutes) Used when updating the Managed Application.
@@ -121,5 +129,5 @@ The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/d
 Managed Application can be imported using the `resource id`, e.g.
 
 ```shell
-$ terraform import azurerm_managed_application.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/group1/providers/Microsoft.Solutions/applications/app1
+terraform import azurerm_managed_application.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/group1/providers/Microsoft.Solutions/applications/app1
 ```

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package authorization_test
 
 import (
@@ -220,6 +223,24 @@ func TestAccRoleAssignment_resourceScoped(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.roleResourceScoped(data, id),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep("skip_service_principal_aad_check"),
+	})
+}
+
+func TestAccRoleAssignment_subscriptionScoped(t *testing.T) {
+	// Only user account is able to run the test, the user account needs to be elevated.
+	// See: https://docs.microsoft.com/en-us/answers/questions/604740/user-does-not-have-access-microsoftsubscriptionali.html
+	t.Skip("Skipping this test as only elevated user account is able to run the test (i.e. via CLI auth)")
+
+	data := acceptance.BuildTestData(t, "azurerm_role_assignment", "test")
+	r := RoleAssignmentResource{}
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.subscriptionScoped(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -545,4 +566,29 @@ resource "azurerm_role_assignment" "test" {
   condition_version    = "1.0"
 }
 `, groupId)
+}
+
+// nolint: unused
+func (RoleAssignmentResource) subscriptionScoped(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+data "azurerm_client_config" "test" {}
+
+resource "azuread_application" "test" {
+  display_name = "acctestspa%d"
+}
+
+resource "azuread_service_principal" "test" {
+  application_id = azuread_application.test.application_id
+}
+
+resource "azurerm_role_assignment" "test" {
+  scope                = "/providers/Microsoft.Subscription"
+  role_definition_name = "Reader"
+  principal_id         = azuread_service_principal.test.object_id
+}
+`, data.RandomInteger)
 }

@@ -1,14 +1,17 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package datafactory
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/datafactory/mgmt/2018-06-01/datafactory"
+	"github.com/Azure/azure-sdk-for-go/services/datafactory/mgmt/2018-06-01/datafactory" // nolint: staticcheck
+	"github.com/hashicorp/go-azure-sdk/resource-manager/datafactory/2018-06-01/factories"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/datafactory/parse"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/datafactory/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
@@ -45,38 +48,31 @@ func resourceDataFactoryDataFlow() *pluginsdk.Resource {
 				Type:         pluginsdk.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: validate.DataFactoryID,
+				ValidateFunc: factories.ValidateFactoryID,
 			},
 
 			"script": {
 				Type:         pluginsdk.TypeString,
-				Required:     true,
+				Optional:     true,
 				ValidateFunc: validation.StringIsNotEmpty,
+				AtLeastOneOf: []string{"script", "script_lines"},
+			},
+
+			"script_lines": {
+				Type:         pluginsdk.TypeList,
+				Optional:     true,
+				AtLeastOneOf: []string{"script", "script_lines"},
+				Elem: &pluginsdk.Schema{
+					Type:         pluginsdk.TypeString,
+					ValidateFunc: validation.StringIsNotEmpty,
+				},
 			},
 
 			"source": SchemaForDataFlowSourceAndSink(),
 
 			"sink": SchemaForDataFlowSourceAndSink(),
 
-			"transformation": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"name": {
-							Type:         pluginsdk.TypeString,
-							Required:     true,
-							ValidateFunc: validation.StringIsNotEmpty,
-						},
-
-						"description": {
-							Type:         pluginsdk.TypeString,
-							Optional:     true,
-							ValidateFunc: validation.StringIsNotEmpty,
-						},
-					},
-				},
-			},
+			"transformation": SchemaForDataFlowSourceTransformation(),
 
 			"annotations": {
 				Type:     pluginsdk.TypeList,
@@ -107,12 +103,12 @@ func resourceDataFactoryDataFlowCreateUpdate(d *pluginsdk.ResourceData, meta int
 	ctx, cancel := timeouts.ForCreateUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	dataFactoryId, err := parse.DataFactoryID(d.Get("data_factory_id").(string))
+	dataFactoryId, err := factories.ParseFactoryID(d.Get("data_factory_id").(string))
 	if err != nil {
 		return err
 	}
 
-	id := parse.NewDataFlowID(subscriptionId, dataFactoryId.ResourceGroup, dataFactoryId.FactoryName, d.Get("name").(string))
+	id := parse.NewDataFlowID(subscriptionId, dataFactoryId.ResourceGroupName, dataFactoryId.FactoryName, d.Get("name").(string))
 	if d.IsNewResource() {
 		existing, err := client.Get(ctx, id.ResourceGroup, id.FactoryName, id.Name, "")
 		if err != nil {
@@ -146,6 +142,10 @@ func resourceDataFactoryDataFlowCreateUpdate(d *pluginsdk.ResourceData, meta int
 		mappingDataFlow.Folder = &datafactory.DataFlowFolder{
 			Name: utils.String(v.(string)),
 		}
+	}
+
+	if v, ok := d.GetOk("script_lines"); ok {
+		mappingDataFlow.ScriptLines = utils.ExpandStringSlice(v.([]interface{}))
 	}
 
 	dataFlow := datafactory.DataFlowResource{
@@ -187,7 +187,7 @@ func resourceDataFactoryDataFlowRead(d *pluginsdk.ResourceData, meta interface{}
 	}
 
 	d.Set("name", id.Name)
-	d.Set("data_factory_id", parse.NewDataFactoryID(id.SubscriptionId, id.ResourceGroup, id.FactoryName).ID())
+	d.Set("data_factory_id", factories.NewFactoryID(id.SubscriptionId, id.ResourceGroup, id.FactoryName).ID())
 	d.Set("description", mappingDataFlow.Description)
 
 	if err := d.Set("annotations", flattenDataFactoryAnnotations(mappingDataFlow.Annotations)); err != nil {
@@ -202,6 +202,7 @@ func resourceDataFactoryDataFlowRead(d *pluginsdk.ResourceData, meta interface{}
 
 	if prop := mappingDataFlow.MappingDataFlowTypeProperties; prop != nil {
 		d.Set("script", prop.Script)
+		d.Set("script_lines", prop.ScriptLines)
 
 		if err := d.Set("source", flattenDataFactoryDataFlowSource(prop.Sources)); err != nil {
 			return fmt.Errorf("setting `source`: %+v", err)
@@ -232,43 +233,4 @@ func resourceDataFactoryDataFlowDelete(d *pluginsdk.ResourceData, meta interface
 	}
 
 	return nil
-}
-
-func expandDataFactoryDataFlowTransformation(input []interface{}) *[]datafactory.Transformation {
-	if len(input) == 0 || input[0] == nil {
-		return nil
-	}
-
-	result := make([]datafactory.Transformation, 0)
-	for _, v := range input {
-		raw := v.(map[string]interface{})
-		result = append(result, datafactory.Transformation{
-			Description: utils.String(raw["description"].(string)),
-			Name:        utils.String(raw["name"].(string)),
-		})
-	}
-	return &result
-}
-
-func flattenDataFactoryDataFlowTransformation(input *[]datafactory.Transformation) []interface{} {
-	if input == nil {
-		return []interface{}{}
-	}
-
-	result := make([]interface{}, 0)
-	for _, v := range *input {
-		name := ""
-		description := ""
-		if v.Name != nil {
-			name = *v.Name
-		}
-		if v.Description != nil {
-			description = *v.Description
-		}
-		result = append(result, map[string]interface{}{
-			"name":        name,
-			"description": description,
-		})
-	}
-	return result
 }

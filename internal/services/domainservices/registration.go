@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package domainservices
 
 import (
@@ -37,5 +40,15 @@ func (r Registration) SupportedResources() map[string]*pluginsdk.Resource {
 	return map[string]*pluginsdk.Resource{
 		"azurerm_active_directory_domain_service":             resourceActiveDirectoryDomainService(),
 		"azurerm_active_directory_domain_service_replica_set": resourceActiveDirectoryDomainServiceReplicaSet(),
+	}
+}
+
+func (r Registration) DataSources() []sdk.DataSource {
+	return []sdk.DataSource{}
+}
+
+func (r Registration) Resources() []sdk.Resource {
+	return []sdk.Resource{
+		DomainServiceTrustResource{},
 	}
 }

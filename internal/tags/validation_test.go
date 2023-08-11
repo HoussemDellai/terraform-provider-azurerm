@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package tags
 
 import (
@@ -19,6 +22,24 @@ func TestValidateMaximumNumberOfTags(t *testing.T) {
 	}
 
 	if !strings.Contains(es[0].Error(), "a maximum of 50 tags") {
+		t.Fatal("Wrong validation error message for too many tags")
+	}
+}
+
+func TestValidateMaximumNumberOfTagsWithMax(t *testing.T) {
+	tagsMap := make(map[string]interface{})
+	for i := 0; i < 16; i++ {
+		tagsMap[fmt.Sprintf("key%d", i)] = fmt.Sprintf("value%d", i)
+	}
+
+	result := ValidateWithMax(15)
+
+	_, es := result(tagsMap, "tags")
+	if len(es) != 1 {
+		t.Fatal("Expected one validation error for too many tags")
+	}
+
+	if !strings.Contains(es[0].Error(), "a maximum of 15 tags") {
 		t.Fatal("Wrong validation error message for too many tags")
 	}
 }

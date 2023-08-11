@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network_test
 
 import (
@@ -5,10 +8,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/network/parse"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -155,27 +159,27 @@ func TestAccSubnet_delegation(t *testing.T) {
 	})
 }
 
-func TestAccSubnet_enforcePrivateLinkEndpointNetworkPolicies(t *testing.T) {
+func TestAccSubnet_enablePrivateEndpointNetworkPolicies(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
 	r := SubnetResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
-			Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, true),
+			Config: r.enablePrivateEndpointNetworkPolicies(data, true),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
 		{
-			Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, false),
+			Config: r.enablePrivateEndpointNetworkPolicies(data, false),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
 		{
-			Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, true),
+			Config: r.enablePrivateEndpointNetworkPolicies(data, true),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -184,33 +188,215 @@ func TestAccSubnet_enforcePrivateLinkEndpointNetworkPolicies(t *testing.T) {
 	})
 }
 
-func TestAccSubnet_enforcePrivateLinkServiceNetworkPolicies(t *testing.T) {
+func TestAccSubnet_enablePrivateLinkServiceNetworkPolicies(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
 	r := SubnetResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
-			Config: r.enforcePrivateLinkServiceNetworkPolicies(data, true),
+			Config: r.enablePrivateLinkServiceNetworkPolicies(data, true),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
 		{
-			Config: r.enforcePrivateLinkServiceNetworkPolicies(data, false),
+			Config: r.enablePrivateLinkServiceNetworkPolicies(data, false),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
 		{
-			Config: r.enforcePrivateLinkServiceNetworkPolicies(data, true),
+			Config: r.enablePrivateLinkServiceNetworkPolicies(data, true),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
 	})
+}
+
+// TODO 4.0: Remove test
+func TestAccSubnet_enforcePrivateLinkEndpointNetworkPolicies(t *testing.T) {
+	if !features.FourPointOhBeta() {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+		})
+	} else {
+		t.Skip("@WodansSon: skipping due to deprecation of the 'enforce_private_link_endpoint_network_policies' field in 4.0")
+	}
+}
+
+// TODO 4.0: Remove test
+func TestAccSubnet_enforcePrivateLinkServiceNetworkPolicies(t *testing.T) {
+	if !features.FourPointOhBeta() {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.enforcePrivateLinkServiceNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkServiceNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkServiceNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+				),
+			},
+			data.ImportStep(),
+		})
+	} else {
+		t.Skip("@WodansSon: skipping due to deprecation of the 'enforce_private_link_service_network_policies' field in 4.0")
+	}
+}
+
+// TODO 4.0: Remove test
+func TestAccSubnet_PrivateLinkPoliciesToggleWithEnforceFirst(t *testing.T) {
+	if !features.FourPointOhBeta() {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("true"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("false"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enablePrivateEndpointNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkServiceNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("true"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("false"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enablePrivateLinkServiceNetworkPolicies(data, true),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+		})
+	} else {
+		t.Skip("@WodansSon: skipping due to deprecation of the 'enforce_private_link_endpoint_network_policies' and 'enforce_private_link_service_network_policies' fields in 4.0")
+	}
+}
+
+// TODO 4.0: Remove test
+func TestAccSubnet_PrivateLinkPoliciesToggleWithEnabledFirst(t *testing.T) {
+	if !features.FourPointOhBeta() {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.enablePrivateEndpointNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("true"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("false"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkEndpointNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enablePrivateLinkServiceNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("true"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("false"),
+				),
+			},
+			data.ImportStep(),
+			{
+				Config: r.enforcePrivateLinkServiceNetworkPolicies(data, false),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+		})
+	} else {
+		t.Skip("@WodansSon: skipping due to deprecation of the 'enforce_private_link_endpoint_network_policies' and 'enforce_private_link_service_network_policies' fields in 4.0")
+	}
 }
 
 func TestAccSubnet_serviceEndpoints(t *testing.T) {
@@ -300,13 +486,78 @@ func TestAccSubnet_updateAddressPrefix(t *testing.T) {
 	})
 }
 
+func TestAccSubnet_privateLinkEndpointNetworkPoliciesValidateDefaultValues(t *testing.T) {
+	if features.FourPointOhBeta() {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.privateLinkEndpointNetworkPoliciesDefaults(data),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("false"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+		})
+	} else {
+		data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+		r := SubnetResource{}
+
+		data.ResourceTest(t, r, []acceptance.TestStep{
+			{
+				Config: r.privateLinkEndpointNetworkPoliciesDefaults(data),
+				Check: acceptance.ComposeTestCheckFunc(
+					check.That(data.ResourceName).ExistsInAzure(r),
+					check.That(data.ResourceName).Key("enforce_private_link_endpoint_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("enforce_private_link_service_network_policies").HasValue("false"),
+					check.That(data.ResourceName).Key("private_endpoint_network_policies_enabled").HasValue("true"),
+					check.That(data.ResourceName).Key("private_link_service_network_policies_enabled").HasValue("true"),
+				),
+			},
+			data.ImportStep(),
+		})
+	}
+}
+
+func TestAccSubnet_updateServiceDelegation(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_subnet", "test")
+	r := SubnetResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.updateServiceDelegation(data, "NGINX.NGINXPLUS/nginxDeployments"),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.updateServiceDelegation(data, "PaloAltoNetworks.Cloudngfw/firewalls"),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.updateServiceDelegation(data, "Qumulo.Storage/fileSystems"),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func (t SubnetResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.SubnetID(state.ID)
+	id, err := commonids.ParseSubnetID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Network.SubnetsClient.Get(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name, "")
+	resp, err := clients.Network.SubnetsClient.Get(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName, "")
 	if err != nil {
 		return nil, fmt.Errorf("reading Subnet (%s): %+v", id, err)
 	}
@@ -315,12 +566,12 @@ func (t SubnetResource) Exists(ctx context.Context, clients *clients.Client, sta
 }
 
 func (SubnetResource) Destroy(ctx context.Context, client *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.SubnetID(state.ID)
+	id, err := commonids.ParseSubnetID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	future, err := client.Network.SubnetsClient.Delete(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name)
+	future, err := client.Network.SubnetsClient.Delete(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName)
 	if err != nil {
 		return nil, fmt.Errorf("deleting Subnet %q: %+v", id, err)
 	}
@@ -333,40 +584,40 @@ func (SubnetResource) Destroy(ctx context.Context, client *clients.Client, state
 }
 
 func (SubnetResource) hasNoNatGateway(ctx context.Context, client *clients.Client, state *pluginsdk.InstanceState) error {
-	id, err := parse.SubnetID(state.ID)
+	id, err := commonids.ParseSubnetID(state.ID)
 	if err != nil {
 		return err
 	}
 
-	subnet, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name, "")
+	subnet, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName, "")
 	if err != nil {
 		if utils.ResponseWasNotFound(subnet.Response) {
-			return fmt.Errorf("Bad: Subnet %q (Virtual Network %q / Resource Group: %q) does not exist", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+			return fmt.Errorf("%s does not exist", id)
 		}
 		return fmt.Errorf("Bad: Get on subnetClient: %+v", err)
 	}
 
 	props := subnet.SubnetPropertiesFormat
 	if props == nil {
-		return fmt.Errorf("Properties was nil for Subnet %q (Virtual Network %q / Resource Group: %q)", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+		return fmt.Errorf("properties was nil for %s", id)
 	}
 
 	if props.NatGateway != nil && ((props.NatGateway.ID == nil) || (props.NatGateway.ID != nil && *props.NatGateway.ID == "")) {
-		return fmt.Errorf("No Route Table should exist for Subnet %q (Virtual Network %q / Resource Group: %q) but got %q", id.Name, id.VirtualNetworkName, id.ResourceGroup, *props.RouteTable.ID)
+		return fmt.Errorf("no Route Table should exist for %s but got %q", id, *props.RouteTable.ID)
 	}
 	return nil
 }
 
 func (SubnetResource) hasNoNetworkSecurityGroup(ctx context.Context, client *clients.Client, state *pluginsdk.InstanceState) error {
-	id, err := parse.SubnetID(state.ID)
+	id, err := commonids.ParseSubnetID(state.ID)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name, "")
+	resp, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName, "")
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
-			return fmt.Errorf("Bad: Subnet %q (Virtual Network %q / Resource Group: %q) does not exist", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+			return fmt.Errorf("%s does not exist", id)
 		}
 
 		return fmt.Errorf("Bad: Get on subnetClient: %+v", err)
@@ -374,26 +625,26 @@ func (SubnetResource) hasNoNetworkSecurityGroup(ctx context.Context, client *cli
 
 	props := resp.SubnetPropertiesFormat
 	if props == nil {
-		return fmt.Errorf("Properties was nil for Subnet %q (Virtual Network %q / Resource Group: %q)", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+		return fmt.Errorf("properties was nil for %s", id)
 	}
 
 	if props.NetworkSecurityGroup != nil && ((props.NetworkSecurityGroup.ID == nil) || (props.NetworkSecurityGroup.ID != nil && *props.NetworkSecurityGroup.ID == "")) {
-		return fmt.Errorf("No Network Security Group should exist for Subnet %q (Virtual Network %q / Resource Group: %q) but got %q", id.Name, id.VirtualNetworkName, id.ResourceGroup, *props.NetworkSecurityGroup.ID)
+		return fmt.Errorf("no Network Security Group should exist for %s but got %q", id, *props.NetworkSecurityGroup.ID)
 	}
 
 	return nil
 }
 
 func (SubnetResource) hasNoRouteTable(ctx context.Context, client *clients.Client, state *pluginsdk.InstanceState) error {
-	id, err := parse.SubnetID(state.ID)
+	id, err := commonids.ParseSubnetID(state.ID)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroup, id.VirtualNetworkName, id.Name, "")
+	resp, err := client.Network.SubnetsClient.Get(ctx, id.ResourceGroupName, id.VirtualNetworkName, id.SubnetName, "")
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
-			return fmt.Errorf("Bad: Subnet %q (Virtual Network %q / Resource Group: %q) does not exist", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+			return fmt.Errorf("%s does not exist", id)
 		}
 
 		return fmt.Errorf("Bad: Get on subnetClient: %+v", err)
@@ -401,11 +652,11 @@ func (SubnetResource) hasNoRouteTable(ctx context.Context, client *clients.Clien
 
 	props := resp.SubnetPropertiesFormat
 	if props == nil {
-		return fmt.Errorf("Properties was nil for Subnet %q (Virtual Network %q / Resource Group: %q)", id.Name, id.VirtualNetworkName, id.ResourceGroup)
+		return fmt.Errorf("properties was nil for %s", id)
 	}
 
 	if props.RouteTable != nil && ((props.RouteTable.ID == nil) || (props.RouteTable.ID != nil && *props.RouteTable.ID == "")) {
-		return fmt.Errorf("No Route Table should exist for Subnet %q (Virtual Network %q / Resource Group: %q) but got %q", id.Name, id.VirtualNetworkName, id.ResourceGroup, *props.RouteTable.ID)
+		return fmt.Errorf("no Route Table should exist for %s but got %q", id, *props.RouteTable.ID)
 	}
 
 	return nil
@@ -481,6 +732,37 @@ resource "azurerm_subnet" "test" {
 `, r.template(data))
 }
 
+func (r SubnetResource) enablePrivateEndpointNetworkPolicies(data acceptance.TestData, enabled bool) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_subnet" "test" {
+  name                 = "internal"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.0.2.0/24"]
+
+  private_endpoint_network_policies_enabled = %t
+}
+`, r.template(data), enabled)
+}
+
+func (r SubnetResource) enablePrivateLinkServiceNetworkPolicies(data acceptance.TestData, enabled bool) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_subnet" "test" {
+  name                 = "internal"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.0.2.0/24"]
+
+  private_link_service_network_policies_enabled = %t
+}
+`, r.template(data), enabled)
+}
+
+// TODO 4.0: Remove test
 func (r SubnetResource) enforcePrivateLinkEndpointNetworkPolicies(data acceptance.TestData, enabled bool) string {
 	return fmt.Sprintf(`
 %s
@@ -496,6 +778,7 @@ resource "azurerm_subnet" "test" {
 `, r.template(data), enabled)
 }
 
+// TODO 4.0: Remove test
 func (r SubnetResource) enforcePrivateLinkServiceNetworkPolicies(data acceptance.TestData, enabled bool) string {
 	return fmt.Sprintf(`
 %s
@@ -509,6 +792,19 @@ resource "azurerm_subnet" "test" {
   enforce_private_link_service_network_policies = %t
 }
 `, r.template(data), enabled)
+}
+
+func (r SubnetResource) privateLinkEndpointNetworkPoliciesDefaults(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_subnet" "test" {
+  name                 = "internal"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+`, r.template(data))
 }
 
 func (SubnetResource) basic_addressPrefixes(data acceptance.TestData) string {
@@ -661,6 +957,31 @@ resource "azurerm_subnet" "test" {
   address_prefixes     = ["10.0.3.0/24"]
 }
 `, r.template(data))
+}
+
+func (r SubnetResource) updateServiceDelegation(data acceptance.TestData, serviceName string) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_subnet" "test" {
+  name                 = "internal"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.0.2.0/24"]
+
+  delegation {
+    name = "first"
+
+    service_delegation {
+      name = "%s"
+
+      actions = [
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+      ]
+    }
+  }
+}
+`, r.template(data), serviceName)
 }
 
 func (SubnetResource) template(data acceptance.TestData) string {

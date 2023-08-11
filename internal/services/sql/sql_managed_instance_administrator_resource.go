@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package sql
 
 import (
@@ -6,12 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/v5.0/sql" // nolint: staticcheck
 	"github.com/gofrs/uuid"
-	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/sql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
@@ -26,7 +28,7 @@ func resourceSqlManagedInstanceAdministrator() *pluginsdk.Resource {
 		Update: resourceSqlManagedInstanceActiveDirectoryAdministratorCreateUpdate,
 		Delete: resourceSqlManagedInstanceActiveDirectoryAdministratorDelete,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_sql_managed_instance_active_directory_administrator` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_managed_instance_active_directory_administrator` resource instead."),
+		DeprecationMessage: "The `azurerm_sql_managed_instance_active_directory_administrator` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_managed_instance_active_directory_administrator` resource instead.",
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
 			_, err := parse.ManagedInstanceAzureActiveDirectoryAdministratorID(id)
@@ -47,7 +49,7 @@ func resourceSqlManagedInstanceAdministrator() *pluginsdk.Resource {
 				ForceNew: true,
 			},
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"login": {
 				Type:     pluginsdk.TypeString,
@@ -77,7 +79,7 @@ func resourceSqlManagedInstanceAdministrator() *pluginsdk.Resource {
 
 func resourceSqlManagedInstanceActiveDirectoryAdministratorCreateUpdate(d *pluginsdk.ResourceData, meta interface{}) error {
 	client := meta.(*clients.Client).Sql.ManagedInstanceAdministratorsClient
-	aadOnlyAuthentictionsClient := meta.(*clients.Client).Sql.ManagedInstanceAzureADOnlyAuthenticationsClient
+	aadOnlyAuthenticationsClient := meta.(*clients.Client).Sql.ManagedInstanceAzureADOnlyAuthenticationsClient
 	subscriptionId := meta.(*clients.Client).Account.SubscriptionId
 	ctx, cancel := timeouts.ForCreateUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
@@ -101,13 +103,13 @@ func resourceSqlManagedInstanceActiveDirectoryAdministratorCreateUpdate(d *plugi
 	}
 
 	if !d.IsNewResource() {
-		aadOnlyDeleteFuture, err := aadOnlyAuthentictionsClient.Delete(ctx, id.ResourceGroup, id.ManagedInstanceName)
+		aadOnlyDeleteFuture, err := aadOnlyAuthenticationsClient.Delete(ctx, id.ResourceGroup, id.ManagedInstanceName)
 		if err != nil {
 			if aadOnlyDeleteFuture.Response() == nil || aadOnlyDeleteFuture.Response().StatusCode != http.StatusBadRequest {
 				return fmt.Errorf("deleting AD Only Authentications %s: %+v", id.String(), err)
 			}
 			log.Printf("[INFO] AD Only Authentication is not removed as AD Admin is not set for %s: %+v", id.String(), err)
-		} else if err = aadOnlyDeleteFuture.WaitForCompletionRef(ctx, aadOnlyAuthentictionsClient.Client); err != nil {
+		} else if err = aadOnlyDeleteFuture.WaitForCompletionRef(ctx, aadOnlyAuthenticationsClient.Client); err != nil {
 			return fmt.Errorf("waiting for deletion of AD Only Authentications %s: %+v", id.String(), err)
 		}
 	}
@@ -135,12 +137,12 @@ func resourceSqlManagedInstanceActiveDirectoryAdministratorCreateUpdate(d *plugi
 			AzureADOnlyAuthentication: utils.Bool(d.Get("azuread_authentication_only").(bool)),
 		},
 	}
-	aadOnlyEnabledFuture, err := aadOnlyAuthentictionsClient.CreateOrUpdate(ctx, id.ResourceGroup, id.ManagedInstanceName, aadOnlyAuthentictionsParams)
+	aadOnlyEnabledFuture, err := aadOnlyAuthenticationsClient.CreateOrUpdate(ctx, id.ResourceGroup, id.ManagedInstanceName, aadOnlyAuthentictionsParams)
 	if err != nil {
 		return fmt.Errorf("setting AAD only authentication for %s: %+v", id.String(), err)
 	}
 
-	if err = aadOnlyEnabledFuture.WaitForCompletionRef(ctx, aadOnlyAuthentictionsClient.Client); err != nil {
+	if err = aadOnlyEnabledFuture.WaitForCompletionRef(ctx, aadOnlyAuthenticationsClient.Client); err != nil {
 		return fmt.Errorf("waiting for setting of AAD only authentication for %s: %+v", id.String(), err)
 	}
 
@@ -151,7 +153,7 @@ func resourceSqlManagedInstanceActiveDirectoryAdministratorCreateUpdate(d *plugi
 
 func resourceSqlManagedInstanceActiveDirectoryAdministratorRead(d *pluginsdk.ResourceData, meta interface{}) error {
 	client := meta.(*clients.Client).Sql.ManagedInstanceAdministratorsClient
-	aadOnlyAuthentictionsClient := meta.(*clients.Client).Sql.ManagedInstanceAzureADOnlyAuthenticationsClient
+	aadOnlyAuthenticationsClient := meta.(*clients.Client).Sql.ManagedInstanceAzureADOnlyAuthenticationsClient
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
@@ -177,7 +179,7 @@ func resourceSqlManagedInstanceActiveDirectoryAdministratorRead(d *pluginsdk.Res
 	d.Set("object_id", resp.Sid.String())
 	d.Set("tenant_id", resp.TenantID.String())
 
-	respAadOnly, err := aadOnlyAuthentictionsClient.Get(ctx, id.ResourceGroup, id.ManagedInstanceName)
+	respAadOnly, err := aadOnlyAuthenticationsClient.Get(ctx, id.ResourceGroup, id.ManagedInstanceName)
 	if err != nil {
 		return fmt.Errorf("reading AAD only authentication for %s: %+v", id.String(), err)
 	}

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package connections
 
 import (
@@ -9,11 +12,11 @@ import (
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/tags"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/web/2016-06-01/connections"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/web/2016-06-01/managedapis"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/connections/sdk/2016-06-01/connections"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/connections/sdk/2016-06-01/managedapis"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
@@ -110,7 +113,7 @@ func resourceConnectionCreate(d *schema.ResourceData, meta interface{}) error {
 	if err != nil {
 		return fmt.Errorf("parsing `managed_app_id`: %+v", err)
 	}
-	location := location.Normalize(managedAppId.Location)
+	location := location.Normalize(managedAppId.LocationName)
 	parameterValues := expandConnectionParameterValues(d.Get("parameter_values").(map[string]interface{}))
 	model := connections.ApiConnectionDefinition{
 		Location: utils.String(location),

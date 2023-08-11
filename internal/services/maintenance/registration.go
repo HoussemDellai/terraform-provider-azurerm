@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package maintenance
 
 import (
@@ -25,7 +28,8 @@ func (r Registration) WebsiteCategories() []string {
 
 func (r Registration) SupportedDataSources() map[string]*pluginsdk.Resource {
 	return map[string]*pluginsdk.Resource{
-		"azurerm_maintenance_configuration": dataSourceMaintenanceConfiguration(),
+		"azurerm_maintenance_configuration":         dataSourceMaintenanceConfiguration(),
+		"azurerm_public_maintenance_configurations": dataSourcePublicMaintenanceConfigurations(),
 	}
 }
 

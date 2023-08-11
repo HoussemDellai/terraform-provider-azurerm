@@ -1,7 +1,7 @@
 ---
 subcategory: "Confidential Ledger"
 layout: "azurerm"
-page_title: "Confidential Ledger: azurerm_confidential_ledger"
+page_title: "Azure Resource Manager: azurerm_confidential_ledger"
 description: |-
   Manages a Confidential Ledger.
 ---
@@ -26,7 +26,7 @@ resource "azurerm_confidential_ledger" "ledger" {
   location            = azurerm_resource_group.example.location
   ledger_type         = "Private"
 
-  aad_based_security_principals {
+  azuread_based_service_principal {
     principal_id     = data.azurerm_client_config.current.object_id
     tenant_id        = data.azurerm_client_config.current.tenant_id
     ledger_role_name = "Administrator"
@@ -44,13 +44,13 @@ The following arguments are supported:
 
 * `location` - (Required) Specifies the supported Azure location where the Confidential Ledger exists. Changing this forces a new resource to be created.
 
-* `azuread_service_principal` - (Required) A list of `azuread_service_principal` blocks as defined below.
+* `azuread_based_service_principal` - (Required) A list of `azuread_based_service_principal` blocks as defined below.
 
 * `ledger_type` - (Required) Specifies the type of Confidential Ledger. Possible values are `Private` and `Public`. Changing this forces a new resource to be created.
 
 ---
 
-* `cert_based_security_principals` - (Optional) A list of `cert_based_security_principals` blocks as defined below.
+* `certificate_based_security_principal` - (Optional) A list of `certificate_based_security_principal` blocks as defined below.
 
 * `tags` - (Optional) A mapping of tags to assign to the Confidential Ledger.
 
@@ -74,7 +74,7 @@ A `certificate_based_security_principal` block supports the following:
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of this Confidential Ledger.
 
@@ -84,7 +84,7 @@ The following attributes are exported:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Confidential Ledger.
 * `update` - (Defaults to 30 minutes) Used when updating the Confidential Ledger.

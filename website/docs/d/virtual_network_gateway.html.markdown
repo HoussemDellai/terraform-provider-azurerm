@@ -62,6 +62,8 @@ output "virtual_network_gateway_id" {
 
 The `ip_configuration` block supports:
 
+* `id` - The resource ID of the IP configuration.
+
 * `name` - A user-defined name of the IP configuration.
 
 * `private_ip_address_allocation` - Defines how the private IP address
@@ -71,6 +73,8 @@ The `ip_configuration` block supports:
     which the virtual network gateway will be created. It is mandatory that
     the associated subnet is named `GatewaySubnet`. Therefore, each virtual
     network can contain at most a single Virtual Network Gateway.
+
+* `private_ip_address` - The Private IP Address associated with the Virtual Network Gateway.
 
 * `public_ip_address_id` - The ID of the Public IP Address associated
     with the Virtual Network Gateway.
@@ -139,14 +143,8 @@ The `root_certificate` block supports:
     authority. The certificate must be provided in Base-64 encoded X.509 format
     (PEM).
 
-The `root_revoked_certificate` block supports:
-
-* `name` - The user-defined name of the revoked certificate.
-
-* `public_cert_data` - The SHA1 thumbprint of the certificate to be revoked.
-
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `read` - (Defaults to 5 minutes) Used when retrieving the Virtual Network Gateway.

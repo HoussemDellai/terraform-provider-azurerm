@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network
 
 import (
@@ -6,8 +9,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	commonValidate "github.com/hashicorp/terraform-provider-azurerm/helpers/validate"
@@ -20,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/network/2022-07-01/network"
 )
 
 var VPNGatewayResourceName = "azurerm_vpn_gateway"
@@ -50,9 +54,9 @@ func resourceVPNGateway() *pluginsdk.Resource {
 				ValidateFunc: validation.StringIsNotEmpty,
 			},
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
 			"virtual_hub_id": {
 				Type:         pluginsdk.TypeString,
@@ -70,6 +74,12 @@ func resourceVPNGateway() *pluginsdk.Resource {
 					"Microsoft Network",
 					"Internet",
 				}, false),
+			},
+
+			"bgp_route_translation_for_nat_enabled": {
+				Type:     pluginsdk.TypeBool,
+				Optional: true,
+				Default:  false,
 			},
 
 			"bgp_settings": {
@@ -221,7 +231,8 @@ func resourceVPNGatewayCreate(d *pluginsdk.ResourceData, meta interface{}) error
 	parameters := network.VpnGateway{
 		Location: utils.String(location),
 		VpnGatewayProperties: &network.VpnGatewayProperties{
-			BgpSettings: bgpSettings,
+			EnableBgpRouteTranslationForNat: utils.Bool(d.Get("bgp_route_translation_for_nat_enabled").(bool)),
+			BgpSettings:                     bgpSettings,
 			VirtualHub: &network.SubResource{
 				ID: utils.String(virtualHubId),
 			},
@@ -307,6 +318,9 @@ func resourceVPNGatewayUpdate(d *pluginsdk.ResourceData, meta interface{}) error
 	if d.HasChange("tags") {
 		existing.Tags = tags.Expand(d.Get("tags").(map[string]interface{}))
 	}
+	if d.HasChange("bgp_route_translation_for_nat_enabled") {
+		existing.EnableBgpRouteTranslationForNat = utils.Bool(d.Get("bgp_route_translation_for_nat_enabled").(bool))
+	}
 
 	bgpSettingsRaw := d.Get("bgp_settings").([]interface{})
 	if len(bgpSettingsRaw) > 0 {
@@ -372,6 +386,12 @@ func resourceVPNGatewayRead(d *pluginsdk.ResourceData, meta interface{}) error {
 		if err := d.Set("bgp_settings", flattenVPNGatewayBGPSettings(props.BgpSettings)); err != nil {
 			return fmt.Errorf("setting `bgp_settings`: %+v", err)
 		}
+
+		bgpRouteTranslationForNatEnabled := false
+		if props.EnableBgpRouteTranslationForNat != nil {
+			bgpRouteTranslationForNatEnabled = *props.EnableBgpRouteTranslationForNat
+		}
+		d.Set("bgp_route_translation_for_nat_enabled", bgpRouteTranslationForNatEnabled)
 
 		scaleUnit := 0
 		if props.VpnGatewayScaleUnit != nil {

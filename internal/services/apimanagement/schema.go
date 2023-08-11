@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package apimanagement
 
 import (
@@ -47,6 +50,16 @@ func apiManagementResourceHostnameSchema() map[string]*pluginsdk.Schema {
 			Type:         pluginsdk.TypeString,
 			Optional:     true,
 			ValidateFunc: validation.IsUUID,
+		},
+
+		"certificate_source": {
+			Type:     pluginsdk.TypeString,
+			Computed: true,
+		},
+
+		"certificate_status": {
+			Type:     pluginsdk.TypeString,
+			Computed: true,
 		},
 
 		"expiry": {

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package containers_test
 
 import (
@@ -6,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/containerregistry/2021-08-01-preview/registries"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/containers/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/containers/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
@@ -233,6 +236,13 @@ func TestAccContainerRegistry_geoReplicationLocation(t *testing.T) {
 			),
 		},
 		data.ImportStep(),
+		{
+			Config: r.geoReplicationMultipleLocationsUpdate(data, secondaryLocation, ternaryLocation),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
 		// updates the SKU to basic.
 		{
 			Config: r.geoReplicationUpdateWithNoLocation_basic(data),
@@ -271,6 +281,13 @@ func TestAccContainerRegistry_geoReplication(t *testing.T) {
 		// updates the ACR with updated locations
 		{
 			Config: r.geoReplicationMultipleLocations(data, secondaryLocation, ternaryLocation),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.geoReplicationMultipleLocationsUpdate(data, secondaryLocation, ternaryLocation),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -577,17 +594,17 @@ func TestAccContainerRegistry_networkRuleBypassOption(t *testing.T) {
 }
 
 func (t ContainerRegistryResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.RegistryID(state.ID)
+	id, err := registries.ParseRegistryID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Containers.RegistriesClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.Containers.ContainerRegistryClient_v2021_08_01_preview.Registries.Get(ctx, *id)
 	if err != nil {
-		return nil, fmt.Errorf("reading Container Registry (%s): %+v", id, err)
+		return nil, fmt.Errorf("retrieving %s: %+v", id, err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (ContainerRegistryResource) basic(data acceptance.TestData) string {
@@ -768,6 +785,37 @@ resource "azurerm_container_registry" "test" {
   }
   georeplications {
     location = "%s"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, primaryLocation, secondaryLocation)
+}
+
+func (ContainerRegistryResource) geoReplicationMultipleLocationsUpdate(data acceptance.TestData, primaryLocation string, secondaryLocation string) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-acr-%d"
+  location = "%s"
+}
+
+resource "azurerm_container_registry" "test" {
+  name                = "testacccr%d"
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  sku                 = "Premium"
+  georeplications {
+    location                = "%s"
+    zone_redundancy_enabled = true
+  }
+  georeplications {
+    location                  = "%s"
+    regional_endpoint_enabled = true
+    tags = {
+      foo = "bar"
+    }
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, primaryLocation, secondaryLocation)

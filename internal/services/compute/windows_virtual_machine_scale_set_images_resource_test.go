@@ -1,11 +1,20 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package compute_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/marketplaceordering/2015-06-01/agreements"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 )
 
 func TestAccWindowsVirtualMachineScaleSet_imagesAutomaticUpdate(t *testing.T) {
@@ -72,6 +81,9 @@ func TestAccWindowsVirtualMachineScaleSet_imagesFromCapturedVirtualMachineImage(
 		{
 			// provision a standard Virtual Machine with an Unmanaged Disk
 			Config: r.imagesFromVirtualMachinePrerequisitesWithVM(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				data.CheckWithClientForResource(WindowsVirtualMachineResource{}.generalizeVirtualMachine, "azurerm_virtual_machine.source"),
+			),
 		},
 		{
 			// then delete the Virtual Machine
@@ -172,10 +184,19 @@ func TestAccWindowsVirtualMachineScaleSet_imagesRollingUpdate(t *testing.T) {
 func TestAccWindowsVirtualMachineScaleSet_imagesPlan(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_windows_virtual_machine_scale_set", "test")
 	r := WindowsVirtualMachineScaleSetResource{}
+	publisher := "plesk"
+	offer := "plesk-onyx-windows"
+	sku := "plsk-win-byol-azr-m"
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
-			Config: r.imagesPlan(data),
+			Config: r.empty(),
+			Check: acceptance.ComposeTestCheckFunc(
+				data.CheckWithClientWithoutResource(r.cancelExistingAgreement(publisher, offer, sku)),
+			),
+		},
+		{
+			Config: r.imagesPlan(data, publisher, offer, sku),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -419,7 +440,9 @@ resource "azurerm_virtual_machine" "source" {
     admin_password = "P@ssword1234!"
   }
 
-  os_profile_windows_config {}
+  os_profile_windows_config {
+    provision_vm_agent = true
+  }
 }
 `, r.imagesFromVirtualMachinePrerequisites(data))
 }
@@ -684,14 +707,14 @@ resource "azurerm_windows_virtual_machine_scale_set" "test" {
 `, r.template(data), data.RandomInteger, data.RandomInteger, version)
 }
 
-func (r WindowsVirtualMachineScaleSetResource) imagesPlan(data acceptance.TestData) string {
+func (r WindowsVirtualMachineScaleSetResource) imagesPlan(data acceptance.TestData, publisher string, offer string, sku string) string {
 	return fmt.Sprintf(`
-%s
+%[1]s
 
 resource "azurerm_marketplace_agreement" "test" {
-  publisher = "plesk"
-  offer     = "plesk-onyx-windows"
-  plan      = "plsk-win-hst-azr-m"
+  publisher = "%[2]s"
+  offer     = "%[3]s"
+  plan      = "%[4]s"
 }
 
 resource "azurerm_windows_virtual_machine_scale_set" "test" {
@@ -704,9 +727,9 @@ resource "azurerm_windows_virtual_machine_scale_set" "test" {
   admin_password      = "P@ssword1234!"
 
   source_image_reference {
-    publisher = "plesk"
-    offer     = "plesk-onyx-windows"
-    sku       = "plsk-win-hst-azr-m"
+    publisher = "%[2]s"
+    offer     = "%[3]s"
+    sku       = "%[4]s"
     version   = "latest"
   }
 
@@ -727,12 +750,53 @@ resource "azurerm_windows_virtual_machine_scale_set" "test" {
   }
 
   plan {
-    name      = "plsk-win-hst-azr-m"
-    product   = "plesk-onyx-windows"
-    publisher = "plesk"
+    publisher = "%[2]s"
+    product   = "%[3]s"
+    name      = "%[4]s"
   }
 
   depends_on = ["azurerm_marketplace_agreement.test"]
 }
-`, r.template(data))
+`, r.template(data), publisher, offer, sku)
+}
+
+func (WindowsVirtualMachineScaleSetResource) empty() string {
+	return `
+provider "azurerm" {
+  features {}
+}
+`
+}
+
+func (r WindowsVirtualMachineScaleSetResource) cancelExistingAgreement(publisher string, offer string, sku string) acceptance.ClientCheckFunc {
+	return func(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) error {
+		client := clients.Compute.MarketplaceAgreementsClient
+		subscriptionId := clients.Account.SubscriptionId
+		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(15*time.Minute))
+		defer cancel()
+
+		idGet := agreements.NewOfferPlanID(subscriptionId, publisher, offer, sku)
+		idCancel := agreements.NewPlanID(subscriptionId, publisher, offer, sku)
+
+		existing, err := client.MarketplaceAgreementsGet(ctx, idGet)
+		if err != nil {
+			return err
+		}
+
+		if model := existing.Model; model != nil {
+			if props := model.Properties; props != nil {
+				if accepted := props.Accepted; accepted != nil && *accepted {
+					resp, err := client.MarketplaceAgreementsCancel(ctx, idCancel)
+					if err != nil {
+						if response.WasNotFound(resp.HttpResponse) {
+							return fmt.Errorf("marketplace agreement %q does not exist", idGet)
+						}
+						return fmt.Errorf("canceling %s: %+v", idGet, err)
+					}
+				}
+			}
+		}
+
+		return nil
+	}
 }

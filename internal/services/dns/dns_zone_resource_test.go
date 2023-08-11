@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package dns_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/dns/2018-05-01/zones"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/dns/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -71,11 +74,48 @@ func TestAccDnsZone_withTags(t *testing.T) {
 	})
 }
 
-func TestAccDnsZone_withSOARecord(t *testing.T) {
+func TestAccDnsZone_basicSOARecord(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_dns_zone", "test")
 	r := DnsZoneResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.withBasicSOARecord(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccDnsZone_completeSOARecord(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_dns_zone", "test")
+	r := DnsZoneResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.withCompletedSOARecord(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccDnsZone_updateSOARecord(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_dns_zone", "test")
+	r := DnsZoneResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.basic(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
 		{
 			Config: r.withBasicSOARecord(data),
 			Check: acceptance.ComposeTestCheckFunc(
@@ -101,17 +141,17 @@ func TestAccDnsZone_withSOARecord(t *testing.T) {
 }
 
 func (DnsZoneResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.DnsZoneID(state.ID)
+	id, err := zones.ParseDnsZoneID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Dns.ZonesClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.Dns.Zones.Get(ctx, *id)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving DNS zone %s (resource group: %s): %v", id.Name, id.ResourceGroup, err)
+		return nil, fmt.Errorf("retrieving %s: %+v", id, err)
 	}
 
-	return utils.Bool(resp.ZoneProperties != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (DnsZoneResource) basic(data acceptance.TestData) string {
@@ -205,8 +245,7 @@ resource "azurerm_dns_zone" "test" {
   resource_group_name = azurerm_resource_group.test.name
 
   soa_record {
-    email     = "testemail.com"
-    host_name = "testhost.contoso.com"
+    email = "testemail.com"
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
@@ -229,7 +268,6 @@ resource "azurerm_dns_zone" "test" {
 
   soa_record {
     email         = "testemail.com"
-    host_name     = "testhost.contoso.com"
     expire_time   = 2419200
     minimum_ttl   = 200
     refresh_time  = 2600

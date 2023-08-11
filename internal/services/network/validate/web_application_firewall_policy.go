@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import (
@@ -5,6 +8,7 @@ import (
 )
 
 var ValidateWebApplicationFirewallPolicyRuleGroupName = validation.StringInSlice([]string{
+	"BadBots",
 	"crs_20_protocol_violations",
 	"crs_21_protocol_anomalies",
 	"crs_23_request_limits",
@@ -16,7 +20,8 @@ var ValidateWebApplicationFirewallPolicyRuleGroupName = validation.StringInSlice
 	"crs_42_tight_security",
 	"crs_45_trojans",
 	"General",
-	"KNOWN-CVES",
+	"GoodBots",
+	"Known-CVEs",
 	"REQUEST-911-METHOD-ENFORCEMENT",
 	"REQUEST-913-SCANNER-DETECTION",
 	"REQUEST-920-PROTOCOL-ENFORCEMENT",
@@ -29,6 +34,7 @@ var ValidateWebApplicationFirewallPolicyRuleGroupName = validation.StringInSlice
 	"REQUEST-942-APPLICATION-ATTACK-SQLI",
 	"REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION",
 	"REQUEST-944-APPLICATION-ATTACK-JAVA",
+	"UnknownBots",
 }, false)
 
 var ValidateWebApplicationFirewallPolicyRuleSetVersion = validation.StringInSlice([]string{
@@ -43,4 +49,12 @@ var ValidateWebApplicationFirewallPolicyRuleSetVersion = validation.StringInSlic
 var ValidateWebApplicationFirewallPolicyRuleSetType = validation.StringInSlice([]string{
 	"OWASP",
 	"Microsoft_BotManagerRuleSet",
+}, false)
+
+var ValidateWebApplicationFirewallPolicyExclusionRuleSetVersion = validation.StringInSlice([]string{
+	"3.2",
+}, false)
+
+var ValidateWebApplicationFirewallPolicyExclusionRuleSetType = validation.StringInSlice([]string{
+	"OWASP",
 }, false)

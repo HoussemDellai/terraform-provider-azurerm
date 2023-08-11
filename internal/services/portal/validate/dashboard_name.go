@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import (
@@ -8,8 +11,8 @@ import (
 func DashboardName(v interface{}, k string) (warnings []string, errors []error) {
 	value := v.(string)
 
-	if len(value) > 64 {
-		errors = append(errors, fmt.Errorf("%q may not exceed 64 characters in length", k))
+	if len(value) > 160 {
+		errors = append(errors, fmt.Errorf("%q may not exceed 160 characters in length", k))
 	}
 
 	// only alpanumeric and hyphens

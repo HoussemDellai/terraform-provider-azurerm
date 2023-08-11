@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package postgres_test
 
 import (
@@ -6,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/postgresql/2017-12-01/servers"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/postgres/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -393,17 +396,23 @@ func TestMinTlsVersionOnServerUpdate(t *testing.T) {
 }
 
 func (t PostgreSQLServerResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.ServerID(state.ID)
+	id, err := servers.ParseServerID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Postgres.ServersClient.Get(ctx, id.ResourceGroup, id.Name)
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+	}
+
+	resp, err := clients.Postgres.ServersClient.Get(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("reading Postgresql Server (%s): %+v", id.String(), err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (PostgreSQLServerResource) template(data acceptance.TestData, sku, version string) string {
@@ -798,7 +807,8 @@ resource "azurerm_postgresql_server" "restore" {
   creation_source_server_id = azurerm_postgresql_server.test.id
   restore_point_in_time     = "%[3]s"
 
-  ssl_enforcement_enabled = true
+  ssl_enforcement_enabled       = true
+  public_network_access_enabled = false
 }
 `, r.gp(data, version), data.RandomInteger, restoreTime, version)
 }

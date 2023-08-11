@@ -16,8 +16,8 @@ Use this data source to access information about a Platform Image.
 data "azurerm_platform_image" "example" {
   location  = "West Europe"
   publisher = "Canonical"
-  offer     = "UbuntuServer"
-  sku       = "16.04-LTS"
+  offer     = "0001-com-ubuntu-server-focal"
+  sku       = "20_04-lts"
 }
 
 output "id" {
@@ -43,6 +43,6 @@ output "id" {
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `read` - (Defaults to 5 minutes) Used when retrieving the Platform Image.

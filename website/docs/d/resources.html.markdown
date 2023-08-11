@@ -72,6 +72,8 @@ The `resource` block exports the following:
 
 * `id` - The ID of this Resource.
 
+* `resource_group_name` - The name of the Resource Group in which this Resource exists.
+
 * `type` - The type of this Resource. (e.g. `Microsoft.Network/virtualNetworks`).
 
 * `location` - The Azure Region in which this Resource exists.
@@ -80,6 +82,6 @@ The `resource` block exports the following:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `read` - (Defaults to 5 minutes) Used when retrieving the Resources.

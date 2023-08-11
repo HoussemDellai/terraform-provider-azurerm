@@ -3,7 +3,7 @@ subcategory: "Recovery Services"
 layout: "azurerm"
 page_title: "Azure Resource Manager: azurerm_backup_policy_vm"
 description: |-
-  Gets information about an existing existing VM Backup Policy.
+  Gets information about an existing VM Backup Policy.
 ---
 
 # Data Source: azurerm_backup_policy_vm
@@ -38,6 +38,6 @@ The following attributes are exported:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `read` - (Defaults to 5 minutes) Used when retrieving the Recovery Services VM Protection Policy.

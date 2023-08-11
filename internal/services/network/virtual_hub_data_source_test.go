@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network_test
 
 import (
@@ -21,7 +24,7 @@ func TestAccDataSourceAzureRMVirtualHub_basic(t *testing.T) {
 				check.That(data.ResourceName).Key("address_prefix").Exists(),
 				check.That(data.ResourceName).Key("virtual_wan_id").Exists(),
 				check.That(data.ResourceName).Key("virtual_router_asn").Exists(),
-				check.That(data.ResourceName).Key("virtual_router_ips").Exists(),
+				check.That(data.ResourceName).Key("virtual_router_ips.#").Exists(),
 			),
 		},
 	})

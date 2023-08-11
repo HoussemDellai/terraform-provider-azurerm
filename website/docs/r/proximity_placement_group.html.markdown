@@ -40,17 +40,25 @@ The following arguments are supported:
 
 * `location` - (Required) Specifies the supported Azure location where the resource exists. Changing this forces a new resource to be created.
 
+* `allowed_vm_sizes` - (Optional) Specifies the supported sizes of Virtual Machines that can be created in the Proximity Placement Group.
+
+~> **NOTE:** Removing `allowed_vm_sizes` after it is set forces a new resource to be created.
+
+* `zone` - (Optional) Specifies the supported zone of the Proximity Placement Group. Changing this forces a new resource to be created.
+
+~> **NOTE:** `allowed_vm_sizes` must be set when `zone` is specified.
+
 * `tags` - (Optional) A mapping of tags to assign to the resource.
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Proximity Placement Group.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Proximity Placement Group.
 * `update` - (Defaults to 30 minutes) Used when updating the Proximity Placement Group.

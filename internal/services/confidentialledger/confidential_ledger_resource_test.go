@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package confidentialledger_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/confidentialledger/2022-05-13/confidentialledger"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/confidentialledger/sdk/2021-05-13-preview/confidentialledger"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -126,7 +129,7 @@ func (ConfidentialLedgerResource) Exists(ctx context.Context, clients *clients.C
 		return nil, err
 	}
 
-	resp, err := clients.ConfidentialLedger.ConfidentialLedgereClient.LedgerGet(ctx, *id)
+	resp, err := clients.ConfidentialLedger.ConfidentialLedgerClient.LedgerGet(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving %s: %+v", *id, err)
 	}
@@ -144,7 +147,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ledger_type         = "Public"
@@ -168,7 +171,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ledger_type         = "Public"
@@ -208,7 +211,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ledger_type         = "Private"
@@ -232,7 +235,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   resource_group_name = azurerm_resource_group.test.name
   location            = azurerm_resource_group.test.location
   ledger_type         = "Private"
@@ -272,7 +275,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ledger_type         = "Private"
@@ -301,7 +304,7 @@ provider "azurerm" {
 %[1]s
 
 resource "azurerm_confidential_ledger" "test" {
-  name                = "acctest-%[2]d"
+  name                = "acctest-tfci-%[2]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
   ledger_type         = "Public"

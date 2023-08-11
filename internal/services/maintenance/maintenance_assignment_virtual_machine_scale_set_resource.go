@@ -1,19 +1,22 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package maintenance
 
 import (
-	"context"
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/maintenance/mgmt/2021-05-01/maintenance"
+	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
-	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/maintenance/2022-07-01-preview/configurationassignments"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/maintenance/2022-07-01-preview/maintenanceconfigurations"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	parseCompute "github.com/hashicorp/terraform-provider-azurerm/internal/services/compute/parse"
 	validateCompute "github.com/hashicorp/terraform-provider-azurerm/internal/services/compute/validate"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/maintenance/parse"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/maintenance/validate"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/services/maintenance/migration"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/suppress"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
@@ -33,18 +36,32 @@ func resourceArmMaintenanceAssignmentVirtualMachineScaleSet() *pluginsdk.Resourc
 		},
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
-			_, err := parse.MaintenanceAssignmentVirtualMachineScaleSetID(id)
-			return err
+			parsed, err := configurationassignments.ParseScopedConfigurationAssignmentID(id)
+			if err != nil {
+				return err
+			}
+
+			if _, err := parseCompute.VirtualMachineScaleSetID(parsed.Scope); err != nil {
+				return fmt.Errorf("parsing %q as a Virtual Machine Scale Set ID: %+v", parsed.Scope, err)
+			}
+
+			return nil
 		}),
 
+		StateUpgraders: pluginsdk.StateUpgrades(map[int]pluginsdk.StateUpgrade{
+			0: migration.AssignmentVirtualMachineScaleSetV0ToV1{},
+		}),
+		SchemaVersion: 1,
+
 		Schema: map[string]*pluginsdk.Schema{
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
 			"maintenance_configuration_id": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validate.MaintenanceConfigurationID,
+				Type:             pluginsdk.TypeString,
+				Required:         true,
+				ForceNew:         true,
+				ValidateFunc:     maintenanceconfigurations.ValidateMaintenanceConfigurationID,
+				DiffSuppressFunc: suppress.CaseDifference, // TODO remove in 4.0 with a work around or when https://github.com/Azure/azure-rest-api-specs/issues/8653 is fixed
 			},
 
 			"virtual_machine_scale_set_id": {
@@ -52,7 +69,7 @@ func resourceArmMaintenanceAssignmentVirtualMachineScaleSet() *pluginsdk.Resourc
 				Required:         true,
 				ForceNew:         true,
 				ValidateFunc:     validateCompute.VirtualMachineScaleSetID,
-				DiffSuppressFunc: suppress.CaseDifference,
+				DiffSuppressFunc: suppress.CaseDifference, // TODO remove in 4.0
 			},
 		},
 	}
@@ -63,52 +80,43 @@ func resourceArmMaintenanceAssignmentVirtualMachineScaleSetCreate(d *pluginsdk.R
 	ctx, cancel := timeouts.ForCreate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	virtualMachineScaleSetIdRaw := d.Get("virtual_machine_scale_set_id").(string)
-	virtualMachineScaleSetId, _ := parseCompute.VirtualMachineScaleSetID(virtualMachineScaleSetIdRaw)
-
-	existingList, err := getMaintenanceAssignmentVirtualMachineScaleSet(ctx, client, virtualMachineScaleSetId, virtualMachineScaleSetIdRaw)
+	virtualMachineScaleSetId, err := parseCompute.VirtualMachineScaleSetID(d.Get("virtual_machine_scale_set_id").(string))
 	if err != nil {
 		return err
 	}
-	if existingList != nil && len(*existingList) > 0 {
-		existing := (*existingList)[0]
-		if existing.ID != nil && *existing.ID != "" {
-			return tf.ImportAsExistsError("azurerm_maintenance_assignment_virtual_machine_scale_set", *existing.ID)
-		}
+
+	maintenanceConfigurationId, err := maintenanceconfigurations.ParseMaintenanceConfigurationID(d.Get("maintenance_configuration_id").(string))
+	if err != nil {
+		return err
 	}
 
-	maintenanceConfigurationID := d.Get("maintenance_configuration_id").(string)
-	configurationId, _ := parse.MaintenanceConfigurationIDInsensitively(maintenanceConfigurationID)
+	id := configurationassignments.NewScopedConfigurationAssignmentID(virtualMachineScaleSetId.ID(), maintenanceConfigurationId.MaintenanceConfigurationName)
 
-	// set assignment name to configuration name
-	assignmentName := configurationId.Name
-	configurationAssignment := maintenance.ConfigurationAssignment{
-		Name:     utils.String(assignmentName),
+	resp, err := client.Get(ctx, id)
+	if err != nil {
+		if !response.WasNotFound(resp.HttpResponse) {
+			return fmt.Errorf("checking for presence of existing %s: %+v", id, err)
+		}
+	}
+	if !response.WasNotFound(resp.HttpResponse) {
+		return tf.ImportAsExistsError("azurerm_maintenance_assignment_virtual_machine_scale_set", id.ID())
+	}
+
+	configurationAssignment := configurationassignments.ConfigurationAssignment{
+		Name:     utils.String(maintenanceConfigurationId.MaintenanceConfigurationName),
 		Location: utils.String(location.Normalize(d.Get("location").(string))),
-		ConfigurationAssignmentProperties: &maintenance.ConfigurationAssignmentProperties{
-			MaintenanceConfigurationID: utils.String(maintenanceConfigurationID),
-			ResourceID:                 utils.String(virtualMachineScaleSetIdRaw),
+		Properties: &configurationassignments.ConfigurationAssignmentProperties{
+			MaintenanceConfigurationId: utils.String(maintenanceConfigurationId.ID()),
+			ResourceId:                 utils.String(virtualMachineScaleSetId.ID()),
 		},
 	}
 
-	_, err = client.CreateOrUpdate(ctx, virtualMachineScaleSetId.ResourceGroup, "Microsoft.Compute", "virtualMachineScaleSets", virtualMachineScaleSetId.Name, assignmentName, configurationAssignment)
+	_, err = client.CreateOrUpdate(ctx, id, configurationAssignment)
 	if err != nil {
 		return err
 	}
 
-	resp, err := getMaintenanceAssignmentVirtualMachineScaleSet(ctx, client, virtualMachineScaleSetId, virtualMachineScaleSetIdRaw)
-	if err != nil {
-		return err
-	}
-	if resp == nil || len(*resp) == 0 {
-		return fmt.Errorf("could not find Maintenance assignment (virtual machine scale set ID: %q)", virtualMachineScaleSetIdRaw)
-	}
-	assignment := (*resp)[0]
-	if assignment.ID == nil || *assignment.ID == "" {
-		return fmt.Errorf("empty or nil ID of Maintenance Assignment (virtual machine scale set ID %q)", virtualMachineScaleSetIdRaw)
-	}
-
-	d.SetId(*assignment.ID)
+	d.SetId(id.ID())
 	return resourceArmMaintenanceAssignmentVirtualMachineScaleSetRead(d, meta)
 }
 
@@ -117,32 +125,47 @@ func resourceArmMaintenanceAssignmentVirtualMachineScaleSetRead(d *pluginsdk.Res
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id, err := parse.MaintenanceAssignmentVirtualMachineScaleSetID(d.Id())
+	id, err := configurationassignments.ParseScopedConfigurationAssignmentID(d.Id())
 	if err != nil {
 		return err
 	}
 
-	resp, err := getMaintenanceAssignmentVirtualMachineScaleSet(ctx, client, id.VirtualMachineScaleSetId, id.VirtualMachineScaleSetIdRaw)
+	resp, err := client.Get(ctx, *id)
+
 	if err != nil {
-		return err
-	}
-	if resp == nil || len(*resp) == 0 {
-		d.SetId("")
-		return nil
-	}
-	assignment := (*resp)[0]
-	if assignment.ID == nil || *assignment.ID == "" {
-		return fmt.Errorf("empty or nil ID of Maintenance Assignment (virtual machine scale set ID id: %q", id.VirtualMachineScaleSetIdRaw)
+		if response.WasNotFound(resp.HttpResponse) {
+			d.SetId("")
+			return nil
+		}
+		return fmt.Errorf("checking for presence of existing %s: %+v", *id, err)
 	}
 
-	// in list api, `ResourceID` returned is always nil
-	virtualMachineScaleSetId := ""
-	if id.VirtualMachineScaleSetId != nil {
-		virtualMachineScaleSetId = id.VirtualMachineScaleSetId.ID()
+	virtualMachineScaleSetId, err := parseCompute.VirtualMachineScaleSetID(id.Scope)
+	if err != nil {
+		return fmt.Errorf("parsing %q as a virtual machine scale set id: %+v", id.Scope, err)
 	}
-	d.Set("virtual_machine_scale_set_id", virtualMachineScaleSetId)
-	if props := assignment.ConfigurationAssignmentProperties; props != nil {
-		d.Set("maintenance_configuration_id", props.MaintenanceConfigurationID)
+
+	d.Set("virtual_machine_scale_set_id", virtualMachineScaleSetId.ID())
+
+	if model := resp.Model; model != nil {
+		loc := location.NormalizeNilable(model.Location)
+		// location isn't returned by the API
+		if loc == "" {
+			loc = d.Get("location").(string)
+		}
+		d.Set("location", loc)
+
+		if props := model.Properties; props != nil {
+			maintenanceConfigurationId := ""
+			if props.MaintenanceConfigurationId != nil {
+				parsedId, err := maintenanceconfigurations.ParseMaintenanceConfigurationIDInsensitively(*props.MaintenanceConfigurationId)
+				if err != nil {
+					return fmt.Errorf("parsing %q: %+v", *props.MaintenanceConfigurationId, err)
+				}
+				maintenanceConfigurationId = parsedId.ID()
+			}
+			d.Set("maintenance_configuration_id", maintenanceConfigurationId)
+		}
 	}
 	return nil
 }
@@ -152,25 +175,14 @@ func resourceArmMaintenanceAssignmentVirtualMachineScaleSetDelete(d *pluginsdk.R
 	ctx, cancel := timeouts.ForDelete(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id, err := parse.MaintenanceAssignmentVirtualMachineScaleSetID(d.Id())
+	id, err := configurationassignments.ParseScopedConfigurationAssignmentID(d.Id())
 	if err != nil {
 		return err
 	}
 
-	if _, err := client.Delete(ctx, id.VirtualMachineScaleSetId.ResourceGroup, "Microsoft.Compute", "virtualMachineScaleSets", id.VirtualMachineScaleSetId.Name, id.Name); err != nil {
-		return fmt.Errorf("deleting Maintenance Assignment to resource %q: %+v", id.VirtualMachineScaleSetIdRaw, err)
+	if _, err := client.DeleteParent(ctx, *id); err != nil {
+		return fmt.Errorf("deleting %s: %+v", *id, err)
 	}
 
 	return nil
-}
-
-func getMaintenanceAssignmentVirtualMachineScaleSet(ctx context.Context, client *maintenance.ConfigurationAssignmentsClient, id *parseCompute.VirtualMachineScaleSetId, virtualMachineScaleSetId string) (result *[]maintenance.ConfigurationAssignment, err error) {
-	resp, err := client.List(ctx, id.ResourceGroup, "Microsoft.Compute", "virtualMachineScaleSets", id.Name)
-	if err != nil {
-		if !utils.ResponseWasNotFound(resp.Response) {
-			err = fmt.Errorf("checking for presence of existing Maintenance assignment (virtual machine scale set ID: %q): %+v", virtualMachineScaleSetId, err)
-			return
-		}
-	}
-	return resp.Value, nil
 }

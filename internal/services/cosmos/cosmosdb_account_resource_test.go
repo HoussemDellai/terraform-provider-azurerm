@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package cosmos_test
 
 import (
@@ -7,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/cosmos-db/mgmt/2021-10-15/documentdb"
+	"github.com/Azure/azure-sdk-for-go/services/cosmos-db/mgmt/2021-10-15/documentdb" // nolint: staticcheck
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
@@ -21,23 +24,23 @@ import (
 type CosmosDBAccountResource struct{}
 
 func TestAccCosmosDBAccount_basic_global_boundedStaleness(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelBoundedStaleness)
+	testAccCosmosDBAccount_basicDocumentDbWith(t, documentdb.DefaultConsistencyLevelBoundedStaleness)
 }
 
 func TestAccCosmosDBAccount_basic_global_consistentPrefix(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelConsistentPrefix)
+	testAccCosmosDBAccount_basicDocumentDbWith(t, documentdb.DefaultConsistencyLevelConsistentPrefix)
 }
 
 func TestAccCosmosDBAccount_basic_global_eventual(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelEventual)
+	testAccCosmosDBAccount_basicDocumentDbWith(t, documentdb.DefaultConsistencyLevelEventual)
 }
 
 func TestAccCosmosDBAccount_basic_global_session(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelSession)
+	testAccCosmosDBAccount_basicDocumentDbWith(t, documentdb.DefaultConsistencyLevelSession)
 }
 
 func TestAccCosmosDBAccount_basic_global_strong(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelStrong)
+	testAccCosmosDBAccount_basicDocumentDbWith(t, documentdb.DefaultConsistencyLevelStrong)
 }
 
 func TestAccCosmosDBAccount_basic_mongo_boundedStaleness(t *testing.T) {
@@ -61,7 +64,7 @@ func TestAccCosmosDBAccount_basic_mongo_strong(t *testing.T) {
 }
 
 func TestAccCosmosDBAccount_basic_mongo_strong_without_capability(t *testing.T) {
-	testAccCosmosDBAccount_basicWith(t, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelStrong)
+	testAccCosmosDBAccount_basicMongoDBWith(t, documentdb.DefaultConsistencyLevelStrong)
 }
 
 func TestAccCosmosDBAccount_basic_parse_boundedStaleness(t *testing.T) {
@@ -118,6 +121,42 @@ func TestAccCosmosDBAccount_keyVaultUri(t *testing.T) {
 	})
 }
 
+func TestAccCosmosDBAccount_customerManagedKeyWithIdentity(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.keyVaultKeyUriWithSystemAssignedIdentity(data, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelStrong),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.keyVaultKeyUriWithSystemAssignedAndUserAssignedIdentity(data, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelStrong),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.keyVaultKeyUriWithUserAssignedIdentity(data, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelStrong),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.keyVaultKeyUriWithSystemAssignedIdentity(data, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelStrong),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func TestAccCosmosDBAccount_keyVaultUriUpdateConsistancy(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
 	r := CosmosDBAccountResource{}
@@ -134,6 +173,29 @@ func TestAccCosmosDBAccount_keyVaultUriUpdateConsistancy(t *testing.T) {
 			Config: r.key_vault_uri(data, documentdb.DatabaseAccountKindMongoDB, documentdb.DefaultConsistencyLevelSession),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelSession, 1),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccCosmosDBAccount_updateTagsWithUserAssignedDefaultIdentity(t *testing.T) {
+	// Regression test case for issue #22466
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.updateTagWithUserAssignedDefaultIdentity(data, "Production"),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.updateTagWithUserAssignedDefaultIdentity(data, "Sandbox"),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
 			),
 		},
 		data.ImportStep(),
@@ -160,7 +222,21 @@ func TestAccCosmosDBAccount_updateDefaultIdentity(t *testing.T) {
 		},
 		data.ImportStep(),
 		{
-			Config: r.updateDefaultIdentity(data, documentdb.DatabaseAccountKindGlobalDocumentDB, "SystemAssignedIdentity", documentdb.DefaultConsistencyLevelEventual),
+			Config: r.updateDefaultIdentity(data, documentdb.DatabaseAccountKindGlobalDocumentDB, `"SystemAssignedIdentity"`, documentdb.DefaultConsistencyLevelEventual),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.updateDefaultIdentityUserAssigned(data, documentdb.DatabaseAccountKindGlobalDocumentDB, `join("=", ["UserAssignedIdentity", azurerm_user_assigned_identity.test.id])`, documentdb.DefaultConsistencyLevelEventual, "UserAssigned"),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.updateDefaultIdentityUserAssigned(data, documentdb.DatabaseAccountKindGlobalDocumentDB, `join("=", ["UserAssignedIdentity", azurerm_user_assigned_identity.test.id])`, documentdb.DefaultConsistencyLevelEventual, "SystemAssigned, UserAssigned"),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 1),
 			),
@@ -176,6 +252,35 @@ func TestAccCosmosDBAccount_updateDefaultIdentity(t *testing.T) {
 	})
 }
 
+func TestAccCosmosDBAccount_userAssignedIdentityMultiple(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.multipleUserAssignedIdentityBaseState(data),
+		},
+		data.ImportStep(),
+		{
+			Config: r.multipleUserAssignedIdentity(data, "azurerm_user_assigned_identity.test.id"),
+		},
+		data.ImportStep(),
+		{
+			Config: r.multipleUserAssignedIdentity(data, "azurerm_user_assigned_identity.test2.id"),
+		},
+		data.ImportStep(),
+		{
+			Config: r.multipleUserAssignedIdentity(data, "azurerm_user_assigned_identity.test.id"),
+		},
+		data.ImportStep(),
+		{
+			Config: r.multipleUserAssignedIdentityBaseState(data),
+		},
+		data.ImportStep(),
+	})
+}
+
+//nolint:unparam
 func testAccCosmosDBAccount_basicWith(t *testing.T, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) {
 	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
 	r := CosmosDBAccountResource{}
@@ -185,6 +290,22 @@ func testAccCosmosDBAccount_basicWith(t *testing.T, kind documentdb.DatabaseAcco
 			Config: r.basic(data, kind, consistency),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				checkAccCosmosDBAccount_basic(data, consistency, 1),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func testAccCosmosDBAccount_basicDocumentDbWith(t *testing.T, consistency documentdb.DefaultConsistencyLevel) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.basic(data, documentdb.DatabaseAccountKindGlobalDocumentDB, consistency),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, consistency, 1),
+				checkAccCosmosDBAccount_sql(data),
 			),
 		},
 		data.ImportStep(),
@@ -356,6 +477,9 @@ func TestAccCosmosDBAccount_complete_tags(t *testing.T) {
 
 func TestAccCosmosDBAccount_completeZoneRedundant_mongo(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	// Limited regional availability
+	data.Locations.Primary = "westeurope"
+	data.Locations.Secondary = "northeurope"
 	r := CosmosDBAccountResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
@@ -379,6 +503,9 @@ func TestAccCosmosDBAccount_completeZoneRedundant_parse(t *testing.T) {
 
 func testAccCosmosDBAccount_zoneRedundantWith(t *testing.T, kind documentdb.DatabaseAccountKind) {
 	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	// Limited regional availability
+	data.Locations.Primary = "westeurope"
+	data.Locations.Secondary = "northeurope"
 	r := CosmosDBAccountResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
@@ -394,6 +521,9 @@ func testAccCosmosDBAccount_zoneRedundantWith(t *testing.T, kind documentdb.Data
 
 func TestAccCosmosDBAccount_zoneRedundant_update_mongo(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	// Limited regional availability
+	data.Locations.Primary = "westeurope"
+	data.Locations.Secondary = "northeurope"
 	r := CosmosDBAccountResource{}
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
@@ -441,6 +571,13 @@ func TestAccCosmosDBAccount_update_mongo(t *testing.T) {
 		},
 		data.ImportStep(),
 		{
+			Config: r.completeUpdatedMongoDB_RemoveDisableRateLimitingResponsesCapability(data, documentdb.DefaultConsistencyLevelEventual),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 3),
+			),
+		},
+		data.ImportStep(),
+		{
 			Config: r.basicWithResourcesMongoDB(data, documentdb.DefaultConsistencyLevelEventual),
 			Check:  acceptance.ComposeAggregateTestCheckFunc(
 			// checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 1),
@@ -479,6 +616,13 @@ func testAccCosmosDBAccount_updateWith(t *testing.T, kind documentdb.DatabaseAcc
 		data.ImportStep(),
 		{
 			Config: r.completeUpdated(data, kind, documentdb.DefaultConsistencyLevelEventual),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 3),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.completeUpdated_RemoveDisableRateLimitingResponsesCapabilities(data, kind, documentdb.DefaultConsistencyLevelEventual),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 3),
 			),
@@ -595,7 +739,14 @@ func TestAccCosmosDBAccount_capabilitiesUpdate(t *testing.T) {
 		},
 		data.ImportStep(),
 		{
-			Config: r.capabilities(data, documentdb.DatabaseAccountKindGlobalDocumentDB, []string{"EnableTable", "EnableAggregationPipeline"}),
+			Config: r.capabilities(data, documentdb.DatabaseAccountKindGlobalDocumentDB, []string{"EnableCassandra", "DisableRateLimitingResponses", "AllowSelfServeUpgradeToMongo36", "EnableAggregationPipeline", "MongoDBv3.4", "mongoEnableDocLevelTTL"}),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.capabilities(data, documentdb.DatabaseAccountKindGlobalDocumentDB, []string{"EnableCassandra", "AllowSelfServeUpgradeToMongo36", "EnableAggregationPipeline", "MongoDBv3.4", "mongoEnableDocLevelTTL"}),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
 			),
@@ -655,9 +806,17 @@ func TestAccCosmosDBAccount_analyticalStorage(t *testing.T) {
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
-			Config: r.analyticalStorage(data, "GlobalDocumentDB", documentdb.DefaultConsistencyLevelEventual),
+			Config: r.analyticalStorage(data, "MongoDB", documentdb.DefaultConsistencyLevelStrong, false),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
-				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelEventual, 1),
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
+				check.That(data.ResourceName).Key("analytical_storage_enabled").HasValue("false"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.analyticalStorage(data, "MongoDB", documentdb.DefaultConsistencyLevelStrong, true),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				checkAccCosmosDBAccount_basic(data, documentdb.DefaultConsistencyLevelStrong, 1),
 				check.That(data.ResourceName).Key("analytical_storage_enabled").HasValue("true"),
 			),
 		},
@@ -791,9 +950,11 @@ func TestAccCosmosDBAccount_identity(t *testing.T) {
 		},
 		data.ImportStep(),
 		{
-			Config: r.systemAssignedIdentity(data, documentdb.DefaultConsistencyLevelSession),
+			Config: r.systemAssignedUserAssignedIdentity(data, documentdb.DefaultConsistencyLevelSession),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("identity.0.type").HasValue("SystemAssigned, UserAssigned"),
+				check.That(data.ResourceName).Key("identity.0.identity_ids.#").HasValue("1"),
 				check.That(data.ResourceName).Key("identity.0.principal_id").Exists(),
 				check.That(data.ResourceName).Key("identity.0.tenant_id").Exists(),
 			),
@@ -872,6 +1033,28 @@ func TestAccCosmosDBAccount_backupContinuous(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.basicWithBackupContinuous(data, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelEventual),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccCosmosDBAccount_backupPeriodicToContinuousUpdate(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.basicWithBackupPeriodic(data, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelEventual),
+			Check: acceptance.ComposeAggregateTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.basicWithBackupContinuousUpdate(data, documentdb.DatabaseAccountKindGlobalDocumentDB, documentdb.DefaultConsistencyLevelEventual),
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -1119,6 +1302,18 @@ func TestAccCosmosDBAccount_ipRangeFilters(t *testing.T) {
 			Check: acceptance.ComposeAggregateTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccCosmosDBAccount_withoutMaxAgeInSeconds(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_account", "test")
+	r := CosmosDBAccountResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.withoutMaxAgeInSeconds(data, documentdb.DatabaseAccountKindParse, documentdb.DefaultConsistencyLevelEventual),
 		},
 		data.ImportStep(),
 	})
@@ -1378,7 +1573,7 @@ resource "azurerm_cosmosdb_account" "test" {
     exposed_headers    = ["x-tempo-*"]
     allowed_headers    = ["x-tempo-*"]
     allowed_methods    = ["GET", "PUT"]
-    max_age_in_seconds = "500"
+    max_age_in_seconds = 500
   }
 
   access_key_metadata_writes_enabled    = false
@@ -1436,7 +1631,7 @@ resource "azurerm_cosmosdb_account" "test" {
     exposed_headers    = ["x-tempo-*"]
     allowed_headers    = ["x-tempo-*"]
     allowed_methods    = ["GET", "PUT"]
-    max_age_in_seconds = "500"
+    max_age_in_seconds = 500
   }
   access_key_metadata_writes_enabled    = false
   network_acl_bypass_for_azure_services = true
@@ -1501,7 +1696,7 @@ resource "azurerm_cosmosdb_account" "test" {
     exposed_headers    = ["x-tempo-*"]
     allowed_headers    = ["x-tempo-*"]
     allowed_methods    = ["GET", "PUT"]
-    max_age_in_seconds = "500"
+    max_age_in_seconds = 500
   }
 
   access_key_metadata_writes_enabled    = false
@@ -1605,6 +1800,22 @@ resource "azurerm_cosmosdb_account" "test" {
   offer_type          = "Standard"
   kind                = "%[3]s"
 
+  capabilities {
+    name = "DisableRateLimitingResponses"
+  }
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
+  }
+
   consistency_policy {
     consistency_level       = "%[4]s"
     max_interval_in_seconds = 360
@@ -1639,7 +1850,72 @@ resource "azurerm_cosmosdb_account" "test" {
     exposed_headers    = ["x-tempo-*", "x-method-*"]
     allowed_headers    = ["*"]
     allowed_methods    = ["GET"]
-    max_age_in_seconds = "2000000000"
+    max_age_in_seconds = 2147483647
+  }
+
+  access_key_metadata_writes_enabled = true
+}
+`, r.completePreReqs(data), data.RandomInteger, string(kind), string(consistency), data.Locations.Secondary, data.Locations.Ternary)
+}
+
+func (r CosmosDBAccountResource) completeUpdated_RemoveDisableRateLimitingResponsesCapabilities(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+%[1]s
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%[2]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%[3]s"
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
+  }
+
+  consistency_policy {
+    consistency_level       = "%[4]s"
+    max_interval_in_seconds = 360
+    max_staleness_prefix    = 170000
+  }
+
+  is_virtual_network_filter_enabled = true
+
+  virtual_network_rule {
+    id = azurerm_subnet.subnet2.id
+  }
+
+  enable_multiple_write_locations = true
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  geo_location {
+    location          = "%[5]s"
+    failover_priority = 1
+  }
+
+  geo_location {
+    location          = "%[6]s"
+    failover_priority = 2
+  }
+
+  cors_rule {
+    allowed_origins    = ["http://www.example.com", "http://www.test.com"]
+    exposed_headers    = ["x-tempo-*", "x-method-*"]
+    allowed_headers    = ["*"]
+    allowed_methods    = ["GET"]
+    max_age_in_seconds = 2147483647
   }
 
   access_key_metadata_writes_enabled = true
@@ -1660,6 +1936,26 @@ resource "azurerm_cosmosdb_account" "test" {
 
   capabilities {
     name = "EnableMongo"
+  }
+
+  capabilities {
+    name = "DisableRateLimitingResponses"
+  }
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "MongoDBv3.4"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
   }
 
   consistency_policy {
@@ -1696,7 +1992,79 @@ resource "azurerm_cosmosdb_account" "test" {
     exposed_headers    = ["x-tempo-*", "x-method-*"]
     allowed_headers    = ["*"]
     allowed_methods    = ["GET"]
-    max_age_in_seconds = "2000000000"
+    max_age_in_seconds = 2147483647
+  }
+  access_key_metadata_writes_enabled = true
+}
+`, r.completePreReqs(data), data.RandomInteger, string(consistency), data.Locations.Secondary, data.Locations.Ternary)
+}
+
+func (r CosmosDBAccountResource) completeUpdatedMongoDB_RemoveDisableRateLimitingResponsesCapability(data acceptance.TestData, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+%[1]s
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%[2]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "MongoDB"
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "MongoDBv3.4"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
+  }
+
+  consistency_policy {
+    consistency_level       = "%[3]s"
+    max_interval_in_seconds = 360
+    max_staleness_prefix    = 170000
+  }
+
+  is_virtual_network_filter_enabled = true
+
+  virtual_network_rule {
+    id = azurerm_subnet.subnet2.id
+  }
+
+  enable_multiple_write_locations = true
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  geo_location {
+    location          = "%[4]s"
+    failover_priority = 1
+  }
+
+  geo_location {
+    location          = "%[5]s"
+    failover_priority = 2
+  }
+
+  cors_rule {
+    allowed_origins    = ["http://www.example.com", "http://www.test.com"]
+    exposed_headers    = ["x-tempo-*", "x-method-*"]
+    allowed_headers    = ["*"]
+    allowed_methods    = ["GET"]
+    max_age_in_seconds = 2147483647
   }
   access_key_metadata_writes_enabled = true
 }
@@ -1713,6 +2081,18 @@ resource "azurerm_cosmosdb_account" "test" {
   resource_group_name = azurerm_resource_group.test.name
   offer_type          = "Standard"
   kind                = "%s"
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
+  }
 
   consistency_policy {
     consistency_level = "%s"
@@ -1739,6 +2119,22 @@ resource "azurerm_cosmosdb_account" "test" {
 
   capabilities {
     name = "EnableMongo"
+  }
+
+  capabilities {
+    name = "AllowSelfServeUpgradeToMongo36"
+  }
+
+  capabilities {
+    name = "EnableAggregationPipeline"
+  }
+
+  capabilities {
+    name = "MongoDBv3.4"
+  }
+
+  capabilities {
+    name = "mongoEnableDocLevelTTL"
   }
 
   consistency_policy {
@@ -2040,7 +2436,7 @@ resource "azurerm_cosmosdb_account" "test" {
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), string(consistency))
 }
 
-func (CosmosDBAccountResource) analyticalStorage(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+func (CosmosDBAccountResource) analyticalStorage(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel, enableAnalyticalStorage bool) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
   features {}
@@ -2058,7 +2454,7 @@ resource "azurerm_cosmosdb_account" "test" {
   offer_type          = "Standard"
   kind                = "%s"
 
-  analytical_storage_enabled = true
+  analytical_storage_enabled = %t
 
   consistency_policy {
     consistency_level = "%s"
@@ -2069,7 +2465,7 @@ resource "azurerm_cosmosdb_account" "test" {
     failover_priority = 0
   }
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), string(consistency))
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), enableAnalyticalStorage, string(consistency))
 }
 
 func (CosmosDBAccountResource) mongoAnalyticalStorage(data acceptance.TestData, consistency documentdb.DefaultConsistencyLevel) string {
@@ -2123,6 +2519,15 @@ func checkAccCosmosDBAccount_basic(data acceptance.TestData, consistency documen
 		check.That(data.ResourceName).Key("secondary_key").Exists(),
 		check.That(data.ResourceName).Key("primary_readonly_key").Exists(),
 		check.That(data.ResourceName).Key("secondary_readonly_key").Exists(),
+	)
+}
+
+func checkAccCosmosDBAccount_sql(data acceptance.TestData) acceptance.TestCheckFunc {
+	return acceptance.ComposeTestCheckFunc(
+		check.That(data.ResourceName).Key("primary_sql_connection_string").Exists(),
+		check.That(data.ResourceName).Key("secondary_sql_connection_string").Exists(),
+		check.That(data.ResourceName).Key("primary_readonly_sql_connection_string").Exists(),
+		check.That(data.ResourceName).Key("secondary_readonly_sql_connection_string").Exists(),
 	)
 }
 
@@ -2206,6 +2611,7 @@ resource "azurerm_key_vault" "test" {
       "Get",
       "Purge",
       "Update",
+      "GetRotationPolicy",
     ]
 
     secret_permissions = [
@@ -2227,6 +2633,7 @@ resource "azurerm_key_vault" "test" {
       "Update",
       "UnwrapKey",
       "WrapKey",
+      "GetRotationPolicy",
     ]
 
     secret_permissions = [
@@ -2277,7 +2684,463 @@ resource "azurerm_cosmosdb_account" "test" {
 `, data.RandomInteger, data.Locations.Primary, data.RandomString, data.RandomString, data.RandomInteger, string(kind), string(consistency))
 }
 
-func (CosmosDBAccountResource) systemAssignedIdentity(data acceptance.TestData, consistency documentdb.DefaultConsistencyLevel) string {
+func (CosmosDBAccountResource) keyVaultKeyUriWithSystemAssignedIdentity(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy       = false
+      purge_soft_deleted_keys_on_destroy = false
+    }
+  }
+}
+
+provider "azuread" {}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+data "azurerm_client_config" "current" {}
+
+data "azuread_service_principal" "cosmosdb" {
+  display_name = "Azure Cosmos DB"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_key_vault" "test" {
+  name                = "acctestkv-%s"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 7
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Purge",
+      "Update",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = azurerm_user_assigned_identity.test.tenant_id
+    object_id = azurerm_user_assigned_identity.test.principal_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azuread_service_principal.cosmosdb.id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+}
+
+resource "azurerm_key_vault_key" "test" {
+  name         = "key-%s"
+  key_vault_id = azurerm_key_vault.test.id
+  key_type     = "RSA"
+  key_size     = 2048
+
+  key_opts = [
+    "decrypt",
+    "encrypt",
+    "sign",
+    "unwrapKey",
+    "verify",
+    "wrapKey",
+  ]
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%s"
+  key_vault_key_id    = azurerm_key_vault_key.test.versionless_id
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level = "%s"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString, data.RandomString, data.RandomInteger, string(kind), string(consistency))
+}
+
+func (CosmosDBAccountResource) keyVaultKeyUriWithSystemAssignedAndUserAssignedIdentity(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy       = false
+      purge_soft_deleted_keys_on_destroy = false
+    }
+  }
+}
+
+provider "azuread" {}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+data "azurerm_client_config" "current" {}
+
+data "azuread_service_principal" "cosmosdb" {
+  display_name = "Azure Cosmos DB"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_key_vault" "test" {
+  name                = "acctestkv-%s"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 7
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Purge",
+      "Update",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = azurerm_user_assigned_identity.test.tenant_id
+    object_id = azurerm_user_assigned_identity.test.principal_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azuread_service_principal.cosmosdb.id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+}
+
+resource "azurerm_key_vault_key" "test" {
+  name         = "key-%s"
+  key_vault_id = azurerm_key_vault.test.id
+  key_type     = "RSA"
+  key_size     = 2048
+
+  key_opts = [
+    "decrypt",
+    "encrypt",
+    "sign",
+    "unwrapKey",
+    "verify",
+    "wrapKey",
+  ]
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%s"
+  key_vault_key_id    = azurerm_key_vault_key.test.versionless_id
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level = "%s"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  identity {
+    type = "SystemAssigned, UserAssigned"
+    identity_ids = [
+      azurerm_user_assigned_identity.test.id
+    ]
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString, data.RandomString, data.RandomInteger, string(kind), string(consistency))
+}
+
+func (CosmosDBAccountResource) keyVaultKeyUriWithUserAssignedIdentity(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy       = false
+      purge_soft_deleted_keys_on_destroy = false
+    }
+  }
+}
+
+provider "azuread" {}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+data "azurerm_client_config" "current" {}
+
+data "azuread_service_principal" "cosmosdb" {
+  display_name = "Azure Cosmos DB"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_key_vault" "test" {
+  name                = "acctestkv-%s"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  purge_protection_enabled   = true
+  soft_delete_retention_days = 7
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Purge",
+      "Update",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = azurerm_user_assigned_identity.test.tenant_id
+    object_id = azurerm_user_assigned_identity.test.principal_id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azuread_service_principal.cosmosdb.id
+
+    key_permissions = [
+      "List",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
+      "UnwrapKey",
+      "WrapKey",
+      "GetRotationPolicy",
+    ]
+
+    secret_permissions = [
+      "Get",
+      "Delete",
+      "Set",
+    ]
+  }
+}
+
+resource "azurerm_key_vault_key" "test" {
+  name         = "key-%s"
+  key_vault_id = azurerm_key_vault.test.id
+  key_type     = "RSA"
+  key_size     = 2048
+
+  key_opts = [
+    "decrypt",
+    "encrypt",
+    "sign",
+    "unwrapKey",
+    "verify",
+    "wrapKey",
+  ]
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%s"
+  key_vault_key_id    = azurerm_key_vault_key.test.versionless_id
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level = "%s"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  identity {
+    type = "UserAssigned"
+    identity_ids = [
+      azurerm_user_assigned_identity.test.id
+    ]
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString, data.RandomString, data.RandomInteger, string(kind), string(consistency))
+}
+
+func (CosmosDBAccountResource) systemAssignedUserAssignedIdentity(data acceptance.TestData, consistency documentdb.DefaultConsistencyLevel) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
   features {}
@@ -2286,6 +3149,12 @@ provider "azurerm" {
 resource "azurerm_resource_group" "test" {
   name     = "acctestRG-cosmos-%d"
   location = "%s"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
 }
 
 resource "azurerm_cosmosdb_account" "test" {
@@ -2309,10 +3178,116 @@ resource "azurerm_cosmosdb_account" "test" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type = "SystemAssigned, UserAssigned"
+    identity_ids = [
+      azurerm_user_assigned_identity.test.id
+    ]
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(consistency))
+}
+
+func (CosmosDBAccountResource) multipleUserAssignedIdentity(data acceptance.TestData, identityResource string) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_user_assigned_identity" "test2" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example-two"
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "MongoDB"
+
+  default_identity_type = join("=", ["UserAssignedIdentity", %[4]s])
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level       = "BoundedStaleness"
+    max_interval_in_seconds = 5
+    max_staleness_prefix    = 100
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [%[4]s]
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, identityResource)
+}
+
+func (CosmosDBAccountResource) multipleUserAssignedIdentityBaseState(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_user_assigned_identity" "test2" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example-two"
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "MongoDB"
+
+  capabilities {
+    name = "EnableMongo"
+  }
+
+  consistency_policy {
+    consistency_level       = "BoundedStaleness"
+    max_interval_in_seconds = 5
+    max_staleness_prefix    = 100
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
 }
 
 func (CosmosDBAccountResource) basicWithBackupPeriodic(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
@@ -2406,6 +3381,42 @@ resource "azurerm_cosmosdb_account" "test" {
   resource_group_name = azurerm_resource_group.test.name
   offer_type          = "Standard"
   kind                = "%s"
+
+  consistency_policy {
+    consistency_level = "%s"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  backup {
+    type = "Continuous"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), string(consistency))
+}
+
+func (CosmosDBAccountResource) basicWithBackupContinuousUpdate(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%s"
+
+  is_virtual_network_filter_enabled = true
 
   consistency_policy {
     consistency_level = "%s"
@@ -2609,6 +3620,30 @@ resource "azurerm_cosmosdb_account" "test" {
 
   capabilities {
     name = "EnableMongo"
+  }
+
+  capabilities {
+    name = "EnableMongo16MBDocumentSupport"
+  }
+
+  capabilities {
+    name = "EnableMongoRetryableWrites"
+  }
+
+  capabilities {
+    name = "EnableMongoRoleBasedAccessControl"
+  }
+
+  capabilities {
+    name = "EnableUniqueCompoundNestedDocs"
+  }
+
+  capabilities {
+    name = "EnableTtlOnCustomPath"
+  }
+
+  capabilities {
+    name = "EnablePartialUniqueIndex"
   }
 
   consistency_policy {
@@ -2820,7 +3855,7 @@ resource "azurerm_cosmosdb_account" "test" {
   resource_group_name   = azurerm_resource_group.test.name
   offer_type            = "Standard"
   kind                  = "%s"
-  default_identity_type = "%s"
+  default_identity_type = %s
 
   identity {
     type = "SystemAssigned"
@@ -2836,6 +3871,48 @@ resource "azurerm_cosmosdb_account" "test" {
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), defaultIdentity, string(consistency))
+}
+
+func (CosmosDBAccountResource) updateDefaultIdentityUserAssigned(data acceptance.TestData, kind documentdb.DatabaseAccountKind, defaultIdentity string, consistency documentdb.DefaultConsistencyLevel, identityType string) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%d"
+  location = "%s"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                  = "acctest-ca-%d"
+  location              = azurerm_resource_group.test.location
+  resource_group_name   = azurerm_resource_group.test.name
+  offer_type            = "Standard"
+  kind                  = "%s"
+  default_identity_type = %s
+
+  identity {
+    type         = "%s"
+    identity_ids = [azurerm_user_assigned_identity.test.id]
+  }
+
+  consistency_policy {
+    consistency_level = "%s"
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, string(kind), defaultIdentity, identityType, string(consistency))
 }
 
 func (CosmosDBAccountResource) defaultCreateMode(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
@@ -3140,4 +4217,100 @@ resource "azurerm_cosmosdb_account" "test" {
   }
 }
 `, r.vNetFiltersPreReqs(data), data.RandomInteger)
+}
+
+func (CosmosDBAccountResource) updateTagWithUserAssignedDefaultIdentity(data acceptance.TestData, tag string) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-cosmos-%[1]d"
+  location = "westeurope"
+}
+
+resource "azurerm_user_assigned_identity" "test" {
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  name                = "acctest-user-example"
+}
+
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%[1]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "GlobalDocumentDB"
+
+  consistency_policy {
+    consistency_level       = "BoundedStaleness"
+    max_interval_in_seconds = 5
+    max_staleness_prefix    = 100
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+
+  default_identity_type = join("=", ["UserAssignedIdentity", azurerm_user_assigned_identity.test.id])
+
+  identity {
+    type         = "SystemAssigned, UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.test.id]
+  }
+
+  tags = {
+    environment  = "%[2]s",
+    created_date = "2023-07-18"
+  }
+}
+`, data.RandomInteger, tag)
+}
+
+func (r CosmosDBAccountResource) withoutMaxAgeInSeconds(data acceptance.TestData, kind documentdb.DatabaseAccountKind, consistency documentdb.DefaultConsistencyLevel) string {
+	return fmt.Sprintf(`
+%[1]s
+resource "azurerm_cosmosdb_account" "test" {
+  name                = "acctest-ca-%[2]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  offer_type          = "Standard"
+  kind                = "%[3]s"
+  consistency_policy {
+    consistency_level       = "%[4]s"
+    max_interval_in_seconds = 300
+    max_staleness_prefix    = 170000
+  }
+  is_virtual_network_filter_enabled = true
+  virtual_network_rule {
+    id = azurerm_subnet.subnet1.id
+  }
+  virtual_network_rule {
+    id = azurerm_subnet.subnet2.id
+  }
+  enable_multiple_write_locations = true
+  geo_location {
+    location          = azurerm_resource_group.test.location
+    failover_priority = 0
+  }
+  geo_location {
+    location          = "%[5]s"
+    failover_priority = 1
+  }
+  geo_location {
+    location          = "%[6]s"
+    failover_priority = 2
+  }
+  cors_rule {
+    allowed_origins = ["http://www.example.com"]
+    exposed_headers = ["x-tempo-*"]
+    allowed_headers = ["x-tempo-*"]
+    allowed_methods = ["GET", "PUT"]
+  }
+  access_key_metadata_writes_enabled    = false
+  network_acl_bypass_for_azure_services = true
+}
+`, r.completePreReqs(data), data.RandomInteger, string(kind), string(consistency), data.Locations.Secondary, data.Locations.Ternary)
 }

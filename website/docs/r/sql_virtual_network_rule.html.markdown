@@ -59,6 +59,7 @@ The following arguments are supported:
 * `name` - (Required) The name of the SQL virtual network rule. Changing this forces a new resource to be created. Cannot be empty and must only contain alphanumeric characters and hyphens. Cannot start with a number, and cannot start or end with a hyphen.
 
 ~> **NOTE:** `name` must be between 1-64 characters long and must satisfy all of the requirements below:
+
 1. Contains only alphanumeric and hyphen characters
 2. Cannot start with a number or hyphen
 3. Cannot end with a hyphen
@@ -75,13 +76,13 @@ The following arguments are supported:
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the SQL virtual network rule.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the SQL Virtual Network Rule.
 * `update` - (Defaults to 30 minutes) Used when updating the SQL Virtual Network Rule.

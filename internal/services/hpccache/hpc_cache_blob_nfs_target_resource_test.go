@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package hpccache_test
 
 import (
@@ -5,12 +8,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-helpers/lang/pointer"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/storagecache/2023-01-01/storagetargets"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/hpccache/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
-	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
 
 type HPCCacheBlobNFSTargetResource struct{}
@@ -103,18 +106,40 @@ func TestAccHPCCacheBlobNFSTarget_requiresImport(t *testing.T) {
 	})
 }
 
+func TestAccHPCCacheBlobNFSTarget_usageModel(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_hpc_cache_blob_nfs_target", "test")
+	r := HPCCacheBlobNFSTargetResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.usageModel(data, "READ_WRITE"),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.usageModel(data, "READ_ONLY"),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func (HPCCacheBlobNFSTargetResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.StorageTargetID(state.ID)
+	id, err := storagetargets.ParseStorageTargetID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.HPCCache.StorageTargetsClient.Get(ctx, id.ResourceGroup, id.CacheName, id.Name)
+	resp, err := clients.HPCCache.StorageTargetsClient.Get(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving HPC Cache Blob Target (%s): %+v", id.String(), err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return pointer.To(resp.Model != nil), nil
 }
 
 func (r HPCCacheBlobNFSTargetResource) basic(data acceptance.TestData) string {
@@ -337,6 +362,10 @@ resource "azurerm_hpc_cache" "test" {
   subnet_id           = azurerm_subnet.test.id
   sku_name            = "Standard_2G"
 
+  timeouts {
+    create = "60m"
+  }
+
   # hpc_cache_blob_target depends on below role_assignments, however these role_assignments need up to 5 minutes to take effect.
   # Since hpc_cache_blob_target depends on the hpc_cache and hpc_cache takes far more than 5 minutes to create, put the dependency here so role_assignments are ready before creating hpc_cache_blob_target.
   depends_on = [
@@ -345,4 +374,19 @@ resource "azurerm_hpc_cache" "test" {
   ]
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomString)
+}
+
+func (r HPCCacheBlobNFSTargetResource) usageModel(data acceptance.TestData, modelName string) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_hpc_cache_blob_nfs_target" "test" {
+  name                 = "acctest-HPCCTGT-%s"
+  resource_group_name  = azurerm_resource_group.test.name
+  cache_name           = azurerm_hpc_cache.test.name
+  storage_container_id = jsondecode(azurerm_resource_group_template_deployment.storage-containers.output_content).id.value
+  namespace_path       = "/p1"
+  usage_model          = "%s"
+}
+`, r.template(data), data.RandomString, modelName)
 }

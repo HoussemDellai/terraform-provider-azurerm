@@ -1,11 +1,20 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package compute_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/marketplaceordering/2015-06-01/agreements"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 )
 
 func TestAccLinuxVirtualMachineScaleSet_imagesAutomaticUpdate(t *testing.T) {
@@ -160,10 +169,19 @@ func TestAccLinuxVirtualMachineScaleSet_imagesRollingUpdate(t *testing.T) {
 func TestAccLinuxVirtualMachineScaleSet_imagesPlan(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_linux_virtual_machine_scale_set", "test")
 	r := LinuxVirtualMachineScaleSetResource{}
+	publisher := "cloudwhizsolutions"
+	offer := "jenkins-with-centos-7-7-cw"
+	sku := "jenkins-with-centos-77-cw"
 
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
-			Config: r.imagesPlan(data),
+			Config: r.empty(),
+			Check: acceptance.ComposeTestCheckFunc(
+				data.CheckWithClientWithoutResource(r.cancelExistingAgreement(publisher, offer, sku)),
+			),
+		},
+		{
+			Config: r.imagesPlan(data, publisher, offer, sku),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -683,18 +701,18 @@ resource "azurerm_linux_virtual_machine_scale_set" "test" {
 `, r.template(data), data.RandomInteger, data.RandomInteger, data.RandomInteger, version)
 }
 
-func (r LinuxVirtualMachineScaleSetResource) imagesPlan(data acceptance.TestData) string {
+func (r LinuxVirtualMachineScaleSetResource) imagesPlan(data acceptance.TestData, publisher string, offer string, sku string) string {
 	return fmt.Sprintf(`
-%s
+%[1]s
 
 resource "azurerm_marketplace_agreement" "test" {
-  publisher = "cloudbees"
-  offer     = "jenkins-operations-center"
-  plan      = "jenkins-operations-center-solo"
+  publisher = "%[3]s"
+  offer     = "%[4]s"
+  plan      = "%[5]s"
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "test" {
-  name                = "acctestvmss-%d"
+  name                = "acctestvmss-%[2]d"
   resource_group_name = azurerm_resource_group.test.name
   location            = azurerm_resource_group.test.location
   sku                 = "Standard_F2"
@@ -705,9 +723,9 @@ resource "azurerm_linux_virtual_machine_scale_set" "test" {
   disable_password_authentication = false
 
   source_image_reference {
-    publisher = "cloudbees"
-    offer     = "jenkins-operations-center"
-    sku       = "jenkins-operations-center-solo"
+    publisher = "%[3]s"
+    offer     = "%[4]s"
+    sku       = "%[5]s"
     version   = "latest"
   }
 
@@ -728,12 +746,53 @@ resource "azurerm_linux_virtual_machine_scale_set" "test" {
   }
 
   plan {
-    name      = "jenkins-operations-center-solo"
-    product   = "jenkins-operations-center"
-    publisher = "cloudbees"
+    publisher = "%[3]s"
+    product   = "%[4]s"
+    name      = "%[5]s"
   }
 
   depends_on = ["azurerm_marketplace_agreement.test"]
 }
-`, r.template(data), data.RandomInteger)
+`, r.template(data), data.RandomInteger, publisher, offer, sku)
+}
+
+func (LinuxVirtualMachineScaleSetResource) empty() string {
+	return `
+provider "azurerm" {
+  features {}
+}
+`
+}
+
+func (r LinuxVirtualMachineScaleSetResource) cancelExistingAgreement(publisher string, offer string, sku string) acceptance.ClientCheckFunc {
+	return func(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) error {
+		client := clients.Compute.MarketplaceAgreementsClient
+		subscriptionId := clients.Account.SubscriptionId
+		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(15*time.Minute))
+		defer cancel()
+
+		idGet := agreements.NewOfferPlanID(subscriptionId, publisher, offer, sku)
+		idCancel := agreements.NewPlanID(subscriptionId, publisher, offer, sku)
+
+		existing, err := client.MarketplaceAgreementsGet(ctx, idGet)
+		if err != nil {
+			return err
+		}
+
+		if model := existing.Model; model != nil {
+			if props := model.Properties; props != nil {
+				if accepted := props.Accepted; accepted != nil && *accepted {
+					resp, err := client.MarketplaceAgreementsCancel(ctx, idCancel)
+					if err != nil {
+						if response.WasNotFound(resp.HttpResponse) {
+							return fmt.Errorf("marketplace agreement %q does not exist", idGet)
+						}
+						return fmt.Errorf("canceling %s: %+v", idGet, err)
+					}
+				}
+			}
+		}
+
+		return nil
+	}
 }

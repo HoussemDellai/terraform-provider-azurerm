@@ -28,8 +28,8 @@ resource "azurerm_resource_group" "example" {
 
 resource "azurerm_mysql_flexible_server" "example" {
   name                   = "example-fs"
-  resource_group_name    = azurerm_resource_group.test.name
-  location               = azurerm_resource_group.test.location
+  resource_group_name    = azurerm_resource_group.example.name
+  location               = azurerm_resource_group.example.location
   administrator_login    = "adminTerraform"
   administrator_password = "H@Sh1CoR3!"
   sku_name               = "GP_Standard_D2ds_v4"
@@ -57,13 +57,13 @@ The following arguments are supported:
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the MySQL Flexible Server Configuration.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the MySQL Flexible Server Configuration.
 * `update` - (Defaults to 30 minutes) Used when updating the MySQL Flexible Server Configuration.
