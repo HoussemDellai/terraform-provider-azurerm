@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package blueprints_test
 
 import (
@@ -5,12 +8,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-helpers/lang/pointer"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/blueprints/2018-11-01-preview/assignment"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/blueprints/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
-	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
 
 type BlueprintAssignmentResource struct{}
@@ -104,17 +107,17 @@ func TestAccBlueprintAssignment_managementGroup(t *testing.T) {
 }
 
 func (t BlueprintAssignmentResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.AssignmentID(state.ID)
+	id, err := assignment.ParseScopedBlueprintAssignmentID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Blueprints.AssignmentsClient.Get(ctx, id.Scope, id.Name)
+	resp, err := clients.Blueprints.AssignmentsClient.Get(ctx, *id)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving Blueprint Assignment %q (scope %q) was not found", id.Name, id.Scope)
+		return nil, fmt.Errorf("retrieving Blueprint Assignment %s was not found", id.String())
 	}
 
-	return utils.Bool(resp.AssignmentProperties != nil), nil
+	return pointer.To(resp.Model != nil), nil
 }
 
 func (BlueprintAssignmentResource) basic(data acceptance.TestData, bpName string, version string) string {
@@ -204,7 +207,7 @@ data "azurerm_blueprint_published_version" "test" {
 
 resource "azurerm_resource_group" "test" {
   name     = "accTestRG-bp-%d"
-  location = "%s"
+  location = "westeurope"
 
   tags = {
     testAcc = "true"
@@ -271,7 +274,7 @@ resource "azurerm_blueprint_assignment" "test" {
     azurerm_role_assignment.owner
   ]
 }
-`, subscription, bpName, version, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
+`, subscription, bpName, version, data.RandomInteger, data.RandomInteger, data.RandomInteger, data.Locations.Primary, data.RandomInteger)
 }
 
 func (BlueprintAssignmentResource) rootManagementGroup(data acceptance.TestData, bpName string, version string) string {

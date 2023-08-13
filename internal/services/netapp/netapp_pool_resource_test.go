@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package netapp_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/netapp/2022-05-01/capacitypools"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/netapp/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -59,7 +62,7 @@ func TestAccNetAppPool_complete(t *testing.T) {
 				check.That(data.ResourceName).ExistsInAzure(r),
 				check.That(data.ResourceName).Key("service_level").HasValue("Standard"),
 				check.That(data.ResourceName).Key("size_in_tb").HasValue("15"),
-				check.That(data.ResourceName).Key("tags.%").HasValue("1"),
+				check.That(data.ResourceName).Key("tags.%").HasValue("2"),
 				check.That(data.ResourceName).Key("tags.FoO").HasValue("BaR"),
 				check.That(data.ResourceName).Key("qos_type").HasValue("Auto"),
 			),
@@ -78,7 +81,7 @@ func TestAccNetAppPool_update(t *testing.T) {
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 				check.That(data.ResourceName).Key("size_in_tb").HasValue("4"),
-				check.That(data.ResourceName).Key("tags.%").HasValue("0"),
+				check.That(data.ResourceName).Key("tags.%").HasValue("1"),
 				check.That(data.ResourceName).Key("qos_type").HasValue("Auto"),
 			),
 		},
@@ -88,7 +91,7 @@ func TestAccNetAppPool_update(t *testing.T) {
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 				check.That(data.ResourceName).Key("size_in_tb").HasValue("15"),
-				check.That(data.ResourceName).Key("tags.%").HasValue("1"),
+				check.That(data.ResourceName).Key("tags.%").HasValue("2"),
 				check.That(data.ResourceName).Key("tags.FoO").HasValue("BaR"),
 				check.That(data.ResourceName).Key("qos_type").HasValue("Auto"),
 			),
@@ -99,7 +102,7 @@ func TestAccNetAppPool_update(t *testing.T) {
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 				check.That(data.ResourceName).Key("size_in_tb").HasValue("15"),
-				check.That(data.ResourceName).Key("tags.%").HasValue("1"),
+				check.That(data.ResourceName).Key("tags.%").HasValue("2"),
 				check.That(data.ResourceName).Key("tags.FoO").HasValue("BaR"),
 				check.That(data.ResourceName).Key("qos_type").HasValue("Manual"),
 			),
@@ -108,17 +111,17 @@ func TestAccNetAppPool_update(t *testing.T) {
 }
 
 func (t NetAppPoolResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.CapacityPoolID(state.ID)
+	id, err := capacitypools.ParseCapacityPoolID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.NetApp.PoolClient.Get(ctx, id.ResourceGroup, id.NetAppAccountName, id.Name)
+	resp, err := clients.NetApp.PoolClient.PoolsGet(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("reading Netapp Pool (%s): %+v", id.String(), err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (NetAppPoolResource) basic(data acceptance.TestData) string {
@@ -145,6 +148,10 @@ resource "azurerm_netapp_pool" "test" {
   resource_group_name = azurerm_resource_group.test.name
   service_level       = "Standard"
   size_in_tb          = 4
+
+  tags = {
+    "CreatedOnDate" = "2022-07-08T23:50:21Z",
+  }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger)
 }
@@ -178,6 +185,11 @@ resource "azurerm_netapp_account" "test" {
   name                = "acctest-NetAppAccount-%d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
 }
 
 resource "azurerm_netapp_pool" "test" {
@@ -190,7 +202,8 @@ resource "azurerm_netapp_pool" "test" {
   qos_type            = "Auto"
 
   tags = {
-    "FoO" = "BaR"
+    "CreatedOnDate" = "2022-07-08T23:50:21Z",
+    "FoO"           = "BaR"
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger)
@@ -211,6 +224,11 @@ resource "azurerm_netapp_account" "test" {
   name                = "acctest-NetAppAccount-%d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
 }
 
 resource "azurerm_netapp_pool" "test" {
@@ -223,7 +241,8 @@ resource "azurerm_netapp_pool" "test" {
   qos_type            = "Manual"
 
   tags = {
-    "FoO" = "BaR"
+    "CreatedOnDate" = "2022-07-08T23:50:21Z",
+    "FoO"           = "BaR"
   }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger)

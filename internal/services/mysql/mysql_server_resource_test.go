@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package mysql_test
 
 import (
@@ -6,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mysql/2017-12-01/servers"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mysql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -229,17 +232,17 @@ func TestAccMySQLServer_infrastructureEncryption(t *testing.T) {
 }
 
 func (t MySQLServerResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.ServerID(state.ID)
+	id, err := servers.ParseServerID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.MySQL.ServersClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.MySQL.MySqlClient.Servers.Get(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("reading MySQL Server (%s): %+v", id, err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (MySQLServerResource) basic(data acceptance.TestData, version string) string {
@@ -356,19 +359,20 @@ resource "azurerm_storage_account" "test" {
 }
 
 resource "azurerm_mysql_server" "test" {
-  name                         = "acctestmysqlsvr-%[1]d"
-  location                     = azurerm_resource_group.test.location
-  resource_group_name          = azurerm_resource_group.test.name
-  sku_name                     = "GP_Gen5_2"
-  administrator_login          = "acctestun"
-  administrator_login_password = "H@Sh1CoR3!updated"
-  auto_grow_enabled            = true
-  backup_retention_days        = 7
-  create_mode                  = "Default"
-  geo_redundant_backup_enabled = false
-  ssl_enforcement_enabled      = false
-  storage_mb                   = 51200
-  version                      = "%[3]s"
+  name                             = "acctestmysqlsvr-%[1]d"
+  location                         = azurerm_resource_group.test.location
+  resource_group_name              = azurerm_resource_group.test.name
+  sku_name                         = "GP_Gen5_2"
+  administrator_login              = "acctestun"
+  administrator_login_password     = "H@Sh1CoR3!updated"
+  auto_grow_enabled                = true
+  backup_retention_days            = 7
+  create_mode                      = "Default"
+  geo_redundant_backup_enabled     = false
+  ssl_enforcement_enabled          = false
+  ssl_minimal_tls_version_enforced = "TLSEnforcementDisabled"
+  storage_mb                       = 51200
+  version                          = "%[3]s"
   threat_detection_policy {
     enabled                    = true
     disabled_alerts            = ["Sql_Injection"]
@@ -402,19 +406,20 @@ resource "azurerm_storage_account" "test" {
 }
 
 resource "azurerm_mysql_server" "test" {
-  name                         = "acctestmysqlsvr-%[1]d"
-  location                     = azurerm_resource_group.test.location
-  resource_group_name          = azurerm_resource_group.test.name
-  sku_name                     = "GP_Gen5_2"
-  administrator_login          = "acctestun"
-  administrator_login_password = "H@Sh1CoR3!updated"
-  auto_grow_enabled            = true
-  backup_retention_days        = 7
-  create_mode                  = "Default"
-  geo_redundant_backup_enabled = false
-  ssl_enforcement_enabled      = false
-  storage_mb                   = 51200
-  version                      = "%[3]s"
+  name                             = "acctestmysqlsvr-%[1]d"
+  location                         = azurerm_resource_group.test.location
+  resource_group_name              = azurerm_resource_group.test.name
+  sku_name                         = "GP_Gen5_2"
+  administrator_login              = "acctestun"
+  administrator_login_password     = "H@Sh1CoR3!updated"
+  auto_grow_enabled                = true
+  backup_retention_days            = 7
+  create_mode                      = "Default"
+  geo_redundant_backup_enabled     = false
+  ssl_enforcement_enabled          = false
+  ssl_minimal_tls_version_enforced = "TLSEnforcementDisabled"
+  storage_mb                       = 51200
+  version                          = "%[3]s"
   threat_detection_policy {
     enabled                    = true
     email_account_admins       = true
@@ -516,6 +521,7 @@ resource "azurerm_mysql_server" "replica" {
 
   create_mode                      = "Replica"
   creation_source_server_id        = azurerm_mysql_server.test.id
+  public_network_access_enabled    = false
   ssl_enforcement_enabled          = true
   ssl_minimal_tls_version_enforced = "TLS1_1"
 }

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package appconfiguration
 
 import (
@@ -19,6 +22,7 @@ func (r Registration) AssociatedGitHubLabel() string {
 func (r Registration) DataSources() []sdk.DataSource {
 	return []sdk.DataSource{
 		KeyDataSource{},
+		KeysDataSource{},
 	}
 }
 

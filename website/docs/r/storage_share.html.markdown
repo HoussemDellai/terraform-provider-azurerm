@@ -49,14 +49,17 @@ resource "azurerm_storage_share" "example" {
 
 The following arguments are supported:
 
-* `name` - (Required) The name of the share. Must be unique within the storage account where the share is located.
+* `name` - (Required) The name of the share. Must be unique within the storage account where the share is located. Changing this forces a new resource to be created.
 
-* `storage_account_name` - (Required) Specifies the storage account in which to create the share.
- Changing this forces a new resource to be created.
+* `storage_account_name` - (Required) Specifies the storage account in which to create the share. Changing this forces a new resource to be created.
+
+* `access_tier` - (Optional) The access tier of the File Share. Possible values are `Hot`, `Cool` and `TransactionOptimized`, `Premium`.
+
+~>**NOTE:** The `FileStorage` `account_kind` of the `azurerm_storage_account` requires `Premium` `access_tier`.
 
 * `acl` - (Optional) One or more `acl` blocks as defined below.
 
-* `enabled_protocol` - (Optional) The protocol used for the share. Possible values are `SMB` and `NFS`. The `SBM` indicates the share can be accessed by SMBv3.0, SMBv2.1 and REST. The `NFS` indicates the share can be accessed by NFSv4.1. Defaults to `SMB`. Changing this forces a new resource to be created.
+* `enabled_protocol` - (Optional) The protocol used for the share. Possible values are `SMB` and `NFS`. The `SMB` indicates the share can be accessed by SMBv3.0, SMBv2.1 and REST. The `NFS` indicates the share can be accessed by NFSv4.1. Defaults to `SMB`. Changing this forces a new resource to be created.
 
 ~>**NOTE:** The `Premium` SKU of the `azurerm_storage_account` is required for the `NFS` protocol.
 
@@ -70,7 +73,7 @@ A `acl` block supports the following:
 
 * `id` - (Required) The ID which should be used for this Shared Identifier.
 
-* `access_policy` - (Required) An `access_policy` block as defined below.
+* `access_policy` - (Optional) An `access_policy` block as defined below.
 
 ---
 
@@ -78,7 +81,7 @@ A `access_policy` block supports the following:
 
 * `permissions` - (Required) The permissions which should be associated with this Shared Identifier. Possible value is combination of `r` (read), `w` (write), `d` (delete), and `l` (list).
 
-~> **Note:** Permission order is strict at the service side, and permissions need to be listed in the order above. 
+~> **Note:** Permission order is strict at the service side, and permissions need to be listed in the order above.
 
 * `start` - (Optional) The time at which this Access Policy should be valid from, in [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) format.
 
@@ -86,7 +89,7 @@ A `access_policy` block supports the following:
 
 ## Attributes Reference
 
-The following attributes are exported in addition to the arguments listed above:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the File Share.
 
@@ -96,7 +99,7 @@ The following attributes are exported in addition to the arguments listed above:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Storage Share.
 * `update` - (Defaults to 30 minutes) Used when updating the Storage Share.

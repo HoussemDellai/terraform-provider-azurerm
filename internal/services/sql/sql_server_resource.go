@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package sql
 
 import (
@@ -7,14 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql" // nolint: staticcheck
 	"github.com/hashicorp/go-azure-helpers/lang/response"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/identity"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/sql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
@@ -31,7 +33,7 @@ func resourceSqlServer() *pluginsdk.Resource {
 		Update: resourceSqlServerCreateUpdate,
 		Delete: resourceSqlServerDelete,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_sql_server` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_server` resource instead."),
+		DeprecationMessage: "The `azurerm_sql_server` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_server` resource instead.",
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
 			_, err := parse.ServerID(id)
@@ -53,9 +55,9 @@ func resourceSqlServer() *pluginsdk.Resource {
 				ValidateFunc: validate.ValidateMsSqlServerName,
 			},
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"version": {
 				Type:     pluginsdk.TypeString,

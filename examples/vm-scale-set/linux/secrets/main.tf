@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 provider "azurerm" {
   features {}
 }
@@ -38,22 +41,22 @@ resource "azurerm_key_vault" "main" {
     object_id = data.azurerm_client_config.current.object_id
 
     certificate_permissions = [
-      "create",
-      "delete",
-      "get",
-      "update",
+      "Create",
+      "Delete",
+      "Get",
+      "Update",
     ]
 
     key_permissions = [
-      "create",
+      "Create",
     ]
 
     secret_permissions = [
-      "set",
+      "Set",
     ]
 
     storage_permissions = [
-      "set",
+      "Set",
     ]
   }
 }

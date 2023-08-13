@@ -32,6 +32,8 @@ The following arguments are supported:
 
 The following attributes are exported:
 
+* `bgp_route_propagation_enabled` - Boolean flag which controls propagation of routes learned by BGP on that route table.
+
 * `id` - The Route Table ID.
 
 * `location` - The Azure Region in which the Route Table exists.
@@ -54,6 +56,6 @@ The `route` block exports the following:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `read` - (Defaults to 5 minutes) Used when retrieving the Route Table.

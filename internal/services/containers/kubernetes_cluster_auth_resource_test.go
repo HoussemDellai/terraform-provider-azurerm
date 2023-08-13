@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package containers_test
 
 import (
@@ -26,7 +29,7 @@ func TestAccKubernetesCluster_apiServerAuthorizedIPRanges(t *testing.T) {
 				check.That(data.ResourceName).Key("kube_admin_config.#").HasValue("0"),
 				check.That(data.ResourceName).Key("kube_admin_config_raw").HasValue(""),
 				check.That(data.ResourceName).Key("default_node_pool.0.max_pods").Exists(),
-				check.That(data.ResourceName).Key("api_server_authorized_ip_ranges.#").HasValue("3"),
+				check.That(data.ResourceName).Key("api_server_access_profile.0.authorized_ip_ranges.#").HasValue("3"),
 			),
 		},
 		data.ImportStep(),
@@ -466,11 +469,13 @@ resource "azurerm_kubernetes_cluster" "test" {
     load_balancer_sku = "standard"
   }
 
-  api_server_authorized_ip_ranges = [
-    "8.8.8.8/32",
-    "8.8.4.4/32",
-    "8.8.2.0/24",
-  ]
+  api_server_access_profile {
+    authorized_ip_ranges = [
+      "8.8.8.8/32",
+      "8.8.4.4/32",
+      "8.8.2.0/24",
+    ]
+  }
 }
 `, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger)
 }
@@ -782,6 +787,51 @@ resource "azurerm_kubernetes_cluster" "test" {
   location            = "${azurerm_resource_group.test.location}"
   resource_group_name = "${azurerm_resource_group.test.name}"
   dns_prefix          = "acctestaks%d"
+
+  linux_profile {
+    admin_username = "acctestuser%d"
+
+    ssh_key {
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqaZoyiz1qbdOQ8xEf6uEu1cCwYowo5FHtsBhqLoDnnp7KUTEBN+L2NxRIfQ781rxV6Iq5jSav6b2Q8z5KiseOlvKA/RF2wqU0UPYqQviQhLmW6THTpmrv/YkUCuzxDpsH7DUDhZcwySLKVVe0Qm3+5N2Ta6UYH3lsDf9R9wTP2K/+vAnflKebuypNlmocIvakFWoZda18FOmsOoIVXQ8HWFNCuw9ZCunMSN62QGamCe3dL5cXlkgHYv7ekJE15IA9aOJcM7e90oeTqo+7HTcWfdu0qQqPWY5ujyMw/llas8tsXY85LFqRnr3gJ02bAscjc477+X+j/gkpFoN1QEmt terraform@demo.tld"
+    }
+  }
+
+  default_node_pool {
+    name       = "default"
+    node_count = 1
+    vm_size    = "Standard_DS2_v2"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  azure_active_directory_role_based_access_control {
+    tenant_id          = var.tenant_id
+    managed            = true
+    azure_rbac_enabled = false
+  }
+}
+`, tenantId, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+}
+
+func (KubernetesClusterResource) roleBasedAccessControlAADManagedConfigVOneDotTwoFourDotNine(data acceptance.TestData, tenantId string) string {
+	return fmt.Sprintf(`
+variable "tenant_id" {
+  default = "%s"
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-aks-%d"
+  location = "%s"
+}
+
+resource "azurerm_kubernetes_cluster" "test" {
+  name                = "acctestaks%d"
+  location            = "${azurerm_resource_group.test.location}"
+  resource_group_name = "${azurerm_resource_group.test.name}"
+  dns_prefix          = "acctestaks%d"
+  kubernetes_version  = "1.24.9"
 
   linux_profile {
     admin_username = "acctestuser%d"

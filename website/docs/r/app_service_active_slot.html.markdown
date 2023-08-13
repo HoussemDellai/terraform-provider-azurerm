@@ -51,13 +51,13 @@ The following arguments are supported:
 
 * `resource_group_name` - (Required) The name of the resource group in which the App Service exists. Changing this forces a new resource to be created.
 
-* `app_service_name` - (Required) The name of the App Service within which the Slot exists.  Changing this forces a new resource to be created.
+* `app_service_name` - (Required) The name of the App Service within which the Slot exists. Changing this forces a new resource to be created.
 
 * `app_service_slot_name` - (Required) The name of the App Service Slot which should be promoted to the Production Slot within the App Service.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the App Service Active Slot.
 * `update` - (Defaults to 30 minutes) Used when updating the App Service Active Slot.

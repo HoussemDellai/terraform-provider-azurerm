@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package firewall_test
 
 import (
@@ -241,6 +244,10 @@ resource "azurerm_firewall_policy_rule_collection_group" "test" {
       protocols {
         type = "Https"
         port = 443
+      }
+      protocols {
+        type = "Mssql"
+        port = 1443
       }
       source_addresses      = ["10.0.0.1"]
       destination_fqdn_tags = ["WindowsDiagnostics"]

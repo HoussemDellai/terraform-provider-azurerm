@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package applicationinsights_test
 
 import (
@@ -101,7 +104,7 @@ func (t AppInsightsWebTestsResource) Exists(ctx context.Context, clients *client
 		return nil, err
 	}
 
-	resp, err := clients.AppInsights.WebTestsClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.AppInsights.WebTestsClient.Get(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving Application Insights '%q' (resource group: '%q') does not exist", id.ResourceGroup, id.Name)
 	}

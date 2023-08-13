@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package policy
 
 import (
@@ -10,8 +13,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/resources/mgmt/2021-06-01-preview/policy"
+	"github.com/Azure/azure-sdk-for-go/services/preview/resources/mgmt/2021-06-01-preview/policy" // nolint: staticcheck
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	mgmtGrpParse "github.com/hashicorp/terraform-provider-azurerm/internal/services/managementgroup/parse"
@@ -99,7 +103,7 @@ func resourcePolicySetDefinitionSchema() map[string]*pluginsdk.Schema {
 			DiffSuppressFunc: pluginsdk.SuppressJsonDiff,
 		},
 
-		//lintignore: S013
+		// lintignore: S013
 		"policy_definition_reference": {
 			Type:     pluginsdk.TypeList,
 			Required: true,
@@ -214,13 +218,15 @@ func resourceArmPolicySetDefinitionCreate(d *pluginsdk.ResourceData, meta interf
 
 	name := d.Get("name").(string)
 	managementGroupName := ""
-	managementGroupID, err := mgmtGrpParse.ManagementGroupID(d.Get("management_group_id").(string))
-	if err != nil {
-		return err
+	if v, ok := d.GetOk("management_group_id"); ok {
+		managementGroupID, err := mgmtGrpParse.ManagementGroupID(v.(string))
+		if err != nil {
+			return err
+		}
+		managementGroupName = managementGroupID.Name
 	}
-	managementGroupName = managementGroupID.Name
 
-	existing, err := getPolicySetDefinitionByName(ctx, client, name, managementGroupID.Name)
+	existing, err := getPolicySetDefinitionByName(ctx, client, name, managementGroupName)
 	if err != nil {
 		if !utils.ResponseWasNotFound(existing.Response) {
 			return fmt.Errorf("checking for presence of existing Policy Set Definition %q: %+v", name, err)
@@ -568,6 +574,7 @@ func expandAzureRMPolicySetDefinitionPolicyDefinitionsUpdate(d *pluginsdk.Resour
 			PolicyDefinitionID:          utils.String(d.Get(fmt.Sprintf("policy_definition_reference.%d.policy_definition_id", i)).(string)),
 			Parameters:                  parameters,
 			PolicyDefinitionReferenceID: utils.String(d.Get(fmt.Sprintf("policy_definition_reference.%d.reference_id", i)).(string)),
+			GroupNames:                  utils.ExpandStringSlice(d.Get(fmt.Sprintf("policy_definition_reference.%d.policy_group_names", i)).(*schema.Set).List()),
 		})
 	}
 

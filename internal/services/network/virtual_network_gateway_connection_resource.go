@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network
 
 import (
@@ -5,16 +8,18 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/network/parse"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/services/network/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/network/2022-07-01/network"
 )
 
 func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
@@ -44,9 +49,9 @@ func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
 				ValidateFunc: validation.StringIsNotEmpty,
 			},
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
 			"type": {
 				Type:     pluginsdk.TypeString,
@@ -63,7 +68,7 @@ func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
 				Type:         pluginsdk.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: azure.ValidateResourceID,
+				ValidateFunc: validate.VirtualNetworkGatewayID,
 			},
 
 			"authorization_key": {
@@ -83,14 +88,32 @@ func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
 				Type:         pluginsdk.TypeString,
 				Optional:     true,
 				ForceNew:     true,
-				ValidateFunc: azure.ValidateResourceIDOrEmpty,
+				ValidateFunc: validate.ExpressRouteCircuitID,
+			},
+
+			"egress_nat_rule_ids": {
+				Type:     pluginsdk.TypeSet,
+				Optional: true,
+				Elem: &pluginsdk.Schema{
+					Type:         pluginsdk.TypeString,
+					ValidateFunc: validate.VirtualNetworkGatewayNatRuleID,
+				},
+			},
+
+			"ingress_nat_rule_ids": {
+				Type:     pluginsdk.TypeSet,
+				Optional: true,
+				Elem: &pluginsdk.Schema{
+					Type:         pluginsdk.TypeString,
+					ValidateFunc: validate.VirtualNetworkGatewayNatRuleID,
+				},
 			},
 
 			"peer_virtual_network_gateway_id": {
 				Type:         pluginsdk.TypeString,
 				Optional:     true,
 				ForceNew:     true,
-				ValidateFunc: azure.ValidateResourceIDOrEmpty,
+				ValidateFunc: validate.VirtualNetworkGatewayID,
 			},
 
 			"local_azure_ip_address_enabled": {
@@ -102,7 +125,7 @@ func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
 			"local_network_gateway_id": {
 				Type:         pluginsdk.TypeString,
 				Optional:     true,
-				ValidateFunc: azure.ValidateResourceIDOrEmpty,
+				ValidateFunc: validate.LocalNetworkGatewayID,
 			},
 
 			// TODO 4.0: change this from enable_* to *_enabled
@@ -196,7 +219,7 @@ func resourceVirtualNetworkGatewayConnection() *pluginsdk.Resource {
 						},
 						"secondary": {
 							Type:         pluginsdk.TypeString,
-							Required:     true,
+							Optional:     true,
 							ValidateFunc: validation.Any(validation.IsIPv4Address),
 						},
 					},
@@ -354,7 +377,7 @@ func resourceVirtualNetworkGatewayConnectionCreateUpdate(d *pluginsdk.ResourceDa
 			return err
 		}
 
-		virtualNetworkGateway, err = vnetGatewayClient.Get(ctx, id.ResourceGroup, gwid.Name)
+		virtualNetworkGateway, err = vnetGatewayClient.Get(ctx, gwid.ResourceGroup, gwid.Name)
 		if err != nil {
 			return err
 		}
@@ -433,9 +456,8 @@ func resourceVirtualNetworkGatewayConnectionRead(d *pluginsdk.ResourceData, meta
 		d.Set("virtual_network_gateway_id", conn.VirtualNetworkGateway1.ID)
 	}
 
-	if conn.AuthorizationKey != nil {
-		d.Set("authorization_key", conn.AuthorizationKey)
-	}
+	// not returned from api - getting from state
+	d.Set("authorization_key", d.Get("authorization_key").(string))
 
 	if conn.DpdTimeoutSeconds != nil {
 		d.Set("dpd_timeout_seconds", conn.DpdTimeoutSeconds)
@@ -473,11 +495,8 @@ func resourceVirtualNetworkGatewayConnectionRead(d *pluginsdk.ResourceData, meta
 		d.Set("shared_key", conn.SharedKey)
 	}
 
-	if conn.GatewayCustomBgpIPAddresses != nil {
-		adresses := flattenGatewayCustomBgpIPAddresses(conn.GatewayCustomBgpIPAddresses)
-		if err := d.Set("custom_bgp_addresses", adresses); err != nil {
-			return fmt.Errorf("setting `custom_bgp_addresses`: %+v", err)
-		}
+	if err := d.Set("custom_bgp_addresses", flattenGatewayCustomBgpIPAddresses(conn.GatewayCustomBgpIPAddresses)); err != nil {
+		return fmt.Errorf("setting `custom_bgp_addresses`: %+v", err)
 	}
 
 	d.Set("connection_protocol", string(conn.ConnectionProtocol))
@@ -499,6 +518,14 @@ func resourceVirtualNetworkGatewayConnectionRead(d *pluginsdk.ResourceData, meta
 	trafficSelectorPolicies := flattenVirtualNetworkGatewayConnectionTrafficSelectorPolicies(conn.TrafficSelectorPolicies)
 	if err := d.Set("traffic_selector_policy", trafficSelectorPolicies); err != nil {
 		return fmt.Errorf("setting `traffic_selector_policy`: %+v", err)
+	}
+
+	if err := d.Set("egress_nat_rule_ids", flattenVirtualNetworkGatewayConnectionNatRuleIds(conn.EgressNatRules)); err != nil {
+		return fmt.Errorf("setting `egress_nat_rule_ids`: %+v", err)
+	}
+
+	if err := d.Set("ingress_nat_rule_ids", flattenVirtualNetworkGatewayConnectionNatRuleIds(conn.IngressNatRules)); err != nil {
+		return fmt.Errorf("setting `ingress_nat_rule_ids`: %+v", err)
 	}
 
 	return tags.FlattenAndSet(d, resp.Tags)
@@ -564,6 +591,14 @@ func getVirtualNetworkGatewayConnectionProperties(d *pluginsdk.ResourceData, vir
 		}
 	}
 
+	if v, ok := d.GetOk("egress_nat_rule_ids"); ok {
+		props.EgressNatRules = expandVirtualNetworkGatewayConnectionNatRuleIds(v.(*pluginsdk.Set).List())
+	}
+
+	if v, ok := d.GetOk("ingress_nat_rule_ids"); ok {
+		props.IngressNatRules = expandVirtualNetworkGatewayConnectionNatRuleIds(v.(*pluginsdk.Set).List())
+	}
+
 	if v, ok := d.GetOk("peer_virtual_network_gateway_id"); ok {
 		gwid, err := parse.VirtualNetworkGatewayID(v.(string))
 		if err != nil {
@@ -622,6 +657,10 @@ func getVirtualNetworkGatewayConnectionProperties(d *pluginsdk.ResourceData, vir
 
 	if utils.NormaliseNilableBool(props.EnableBgp) {
 		if _, ok := d.GetOk("custom_bgp_addresses"); ok {
+			if virtualNetworkGateway.VirtualNetworkGatewayPropertiesFormat == nil || virtualNetworkGateway.VirtualNetworkGatewayPropertiesFormat.BgpSettings == nil || virtualNetworkGateway.VirtualNetworkGatewayPropertiesFormat.BgpSettings.BgpPeeringAddresses == nil {
+				return nil, fmt.Errorf("retrieving BGP peering address from `virtual_network_gateway `%s (%s) failed: get nil", *virtualNetworkGateway.Name, *virtualNetworkGateway.ID)
+			}
+
 			gatewayCustomBgpIPAddresses, err := expandGatewayCustomBgpIPAddresses(d, virtualNetworkGateway.VirtualNetworkGatewayPropertiesFormat.BgpSettings.BgpPeeringAddresses)
 			if err != nil {
 				return nil, err
@@ -738,30 +777,46 @@ func expandGatewayCustomBgpIPAddresses(d *pluginsdk.ResourceData, bgpPeeringAddr
 	primaryAddress := bgAs["primary"].(string)
 	secondaryAddress := bgAs["secondary"].(string)
 
-	var primaryIpConfiguration *string
-	var secondaryIpConfiguration *string
+	var primaryIpConfiguration string
+	var secondaryIpConfiguration string
+
+	if bgpPeeringAddresses == nil {
+		return &customBgpIpAddresses, fmt.Errorf("retrieving BGP peering address from `virtual_network_gateway`, addresses returned nil")
+	}
 
 	for _, address := range *bgpPeeringAddresses {
+		if address.CustomBgpIPAddresses == nil {
+			continue
+		}
+
 		for _, ip := range *address.CustomBgpIPAddresses {
+			if address.IpconfigurationID == nil {
+				continue
+			}
+
 			if ip == primaryAddress {
-				primaryIpConfiguration = address.IpconfigurationID
+				primaryIpConfiguration = *address.IpconfigurationID
 			} else if ip == secondaryAddress {
-				secondaryIpConfiguration = address.IpconfigurationID
+				secondaryIpConfiguration = *address.IpconfigurationID
 			}
 		}
 	}
 
-	if len(*primaryIpConfiguration) == 0 || len(*secondaryIpConfiguration) == 0 {
+	if len(primaryIpConfiguration) == 0 || (secondaryAddress != "" && len(secondaryIpConfiguration) == 0) {
 		return &customBgpIpAddresses, fmt.Errorf("primary or secondary address not found at `virtual_network_gateway` configuration `bgp_settings` `peering_addresses`")
 	}
 
 	customBgpIpAddresses = append(customBgpIpAddresses, network.GatewayCustomBgpIPAddressIPConfiguration{
-		IPConfigurationID:  primaryIpConfiguration,
+		IPConfigurationID:  &primaryIpConfiguration,
 		CustomBgpIPAddress: utils.String(primaryAddress),
-	}, network.GatewayCustomBgpIPAddressIPConfiguration{
-		IPConfigurationID:  secondaryIpConfiguration,
-		CustomBgpIPAddress: utils.String(secondaryAddress),
 	})
+
+	if secondaryAddress != "" {
+		customBgpIpAddresses = append(customBgpIpAddresses, network.GatewayCustomBgpIPAddressIPConfiguration{
+			IPConfigurationID:  &secondaryIpConfiguration,
+			CustomBgpIPAddress: utils.String(secondaryAddress),
+		})
+	}
 
 	return &customBgpIpAddresses, nil
 }
@@ -796,17 +851,21 @@ func flattenVirtualNetworkGatewayConnectionIpsecPolicies(ipsecPolicies *[]networ
 }
 
 func flattenGatewayCustomBgpIPAddresses(gatewayCustomBgpIPAddresses *[]network.GatewayCustomBgpIPAddressIPConfiguration) interface{} {
-	customBgpIpAdresses := make([]interface{}, 0)
-
-	if len(*gatewayCustomBgpIPAddresses) == 2 {
-		addresses := *gatewayCustomBgpIPAddresses
-		customBgpIpAdresses = append(customBgpIpAdresses, map[string]interface{}{
-			"primary":   addresses[0].CustomBgpIPAddress,
-			"secondary": addresses[1].CustomBgpIPAddress,
-		})
+	customBgpIpAddresses := make([]interface{}, 0)
+	if gatewayCustomBgpIPAddresses == nil || len(*gatewayCustomBgpIPAddresses) == 0 {
+		return customBgpIpAddresses
 	}
 
-	return customBgpIpAdresses
+	customBgpIpAddress := map[string]interface{}{}
+	for k, v := range *gatewayCustomBgpIPAddresses {
+		if k == 0 && v.CustomBgpIPAddress != nil {
+			customBgpIpAddress["primary"] = *v.CustomBgpIPAddress
+		} else if k == 1 && v.CustomBgpIPAddress != nil {
+			customBgpIpAddress["secondary"] = *v.CustomBgpIPAddress
+		}
+	}
+
+	return append(customBgpIpAddresses, customBgpIpAddress)
 }
 
 func flattenVirtualNetworkGatewayConnectionTrafficSelectorPolicies(trafficSelectorPolicies *[]network.TrafficSelectorPolicy) []interface{} {
@@ -822,4 +881,34 @@ func flattenVirtualNetworkGatewayConnectionTrafficSelectorPolicies(trafficSelect
 	}
 
 	return schemaTrafficSelectorPolicies
+}
+
+func expandVirtualNetworkGatewayConnectionNatRuleIds(input []interface{}) *[]network.SubResource {
+	results := make([]network.SubResource, 0)
+
+	for _, item := range input {
+		results = append(results, network.SubResource{
+			ID: utils.String(item.(string)),
+		})
+	}
+
+	return &results
+}
+
+func flattenVirtualNetworkGatewayConnectionNatRuleIds(input *[]network.SubResource) []interface{} {
+	results := make([]interface{}, 0)
+	if input == nil {
+		return results
+	}
+
+	for _, item := range *input {
+		var id string
+		if item.ID != nil {
+			id = *item.ID
+		}
+
+		results = append(results, id)
+	}
+
+	return results
 }

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package cdn
 
 import (
@@ -6,9 +9,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/cdn/mgmt/2020-09-01/cdn"
+	"github.com/Azure/azure-sdk-for-go/services/cdn/mgmt/2020-09-01/cdn" // nolint: staticcheck
+	"github.com/hashicorp/go-azure-helpers/lang/pointer"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/cdn/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/cdn/validate"
 	keyvaultClient "github.com/hashicorp/terraform-provider-azurerm/internal/services/keyvault/client"
@@ -21,6 +27,112 @@ import (
 )
 
 func resourceArmCdnEndpointCustomDomain() *pluginsdk.Resource {
+	schema := map[string]*pluginsdk.Schema{
+		"name": {
+			Type:         pluginsdk.TypeString,
+			Required:     true,
+			ForceNew:     true,
+			ValidateFunc: validate.CdnEndpointCustomDomainName(),
+		},
+
+		"cdn_endpoint_id": {
+			Type:         pluginsdk.TypeString,
+			Required:     true,
+			ForceNew:     true,
+			ValidateFunc: validate.EndpointID,
+		},
+
+		"host_name": {
+			Type:         pluginsdk.TypeString,
+			Required:     true,
+			ForceNew:     true,
+			ValidateFunc: validation.StringIsNotEmpty,
+		},
+		"cdn_managed_https": {
+			Type:     pluginsdk.TypeList,
+			Optional: true,
+			MinItems: 1,
+			MaxItems: 1,
+			Elem: &pluginsdk.Resource{
+				Schema: map[string]*pluginsdk.Schema{
+					"certificate_type": {
+						Type:     pluginsdk.TypeString,
+						Required: true,
+						ValidateFunc: validation.StringInSlice([]string{
+							string(cdn.CertificateTypeShared),
+							string(cdn.CertificateTypeDedicated),
+						}, false),
+					},
+					"protocol_type": {
+						Type:     pluginsdk.TypeString,
+						Required: true,
+						ValidateFunc: validation.StringInSlice([]string{
+							string(cdn.ProtocolTypeServerNameIndication),
+							string(cdn.ProtocolTypeIPBased),
+						}, false),
+					},
+					"tls_version": {
+						Type:     pluginsdk.TypeString,
+						Optional: true,
+						ValidateFunc: validation.StringInSlice([]string{
+							string(cdn.MinimumTLSVersionTLS10),
+							string(cdn.MinimumTLSVersionTLS12),
+							string(cdn.MinimumTLSVersionNone),
+						}, false),
+						Default: string(cdn.MinimumTLSVersionTLS12),
+					},
+				},
+			},
+			ConflictsWith: []string{"user_managed_https"},
+		},
+
+		"user_managed_https": {
+			Type:     pluginsdk.TypeList,
+			Optional: true,
+			MinItems: 1,
+			MaxItems: 1,
+			Elem: &pluginsdk.Resource{
+				Schema: map[string]*pluginsdk.Schema{
+					"tls_version": {
+						Type:     pluginsdk.TypeString,
+						Optional: true,
+						ValidateFunc: validation.StringInSlice([]string{
+							string(cdn.MinimumTLSVersionTLS10),
+							string(cdn.MinimumTLSVersionTLS12),
+							string(cdn.MinimumTLSVersionNone),
+						}, false),
+						Default: string(cdn.MinimumTLSVersionTLS12),
+					},
+				},
+			},
+			ConflictsWith: []string{"cdn_managed_https"},
+		},
+	}
+	if !features.FourPointOhBeta() {
+		schema["user_managed_https"].Elem.(*pluginsdk.Resource).Schema["key_vault_certificate_id"] = &pluginsdk.Schema{
+			Type:         pluginsdk.TypeString,
+			Optional:     true,
+			Computed:     true,
+			ValidateFunc: keyvaultValidate.NestedItemIdWithOptionalVersion,
+			ExactlyOneOf: []string{"user_managed_https.0.key_vault_certificate_id", "user_managed_https.0.key_vault_secret_id"},
+			Deprecated:   "This is deprecated in favor of `key_vault_secret_id` as the service is actually looking for a secret, not a certificate",
+		}
+
+		schema["user_managed_https"].Elem.(*pluginsdk.Resource).Schema["key_vault_secret_id"] = &pluginsdk.Schema{
+			Type:         pluginsdk.TypeString,
+			Optional:     true,
+			Computed:     true,
+			ValidateFunc: keyvaultValidate.NestedItemIdWithOptionalVersion,
+			ExactlyOneOf: []string{"user_managed_https.0.key_vault_certificate_id", "user_managed_https.0.key_vault_secret_id"},
+		}
+	} else {
+		schema["user_managed_https"].Elem.(*pluginsdk.Resource).Schema["key_vault_secret_id"] = &pluginsdk.Schema{
+			Type:         pluginsdk.TypeString,
+			Required:     true,
+			ValidateFunc: keyvaultValidate.NestedItemIdWithOptionalVersion,
+		}
+	}
+
 	return &pluginsdk.Resource{
 		Create: resourceArmCdnEndpointCustomDomainCreate,
 		Read:   resourceArmCdnEndpointCustomDomainRead,
@@ -39,92 +151,7 @@ func resourceArmCdnEndpointCustomDomain() *pluginsdk.Resource {
 			Delete: pluginsdk.DefaultTimeout(12 * time.Hour),
 		},
 
-		Schema: map[string]*pluginsdk.Schema{
-			"name": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validate.CdnEndpointCustomDomainName(),
-			},
-
-			"cdn_endpoint_id": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validate.EndpointID,
-			},
-
-			"host_name": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validation.StringIsNotEmpty,
-			},
-			"cdn_managed_https": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				MinItems: 1,
-				MaxItems: 1,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"certificate_type": {
-							Type:     pluginsdk.TypeString,
-							Required: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								string(cdn.CertificateTypeShared),
-								string(cdn.CertificateTypeDedicated),
-							}, false),
-						},
-						"protocol_type": {
-							Type:     pluginsdk.TypeString,
-							Required: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								string(cdn.ProtocolTypeServerNameIndication),
-								string(cdn.ProtocolTypeIPBased),
-							}, false),
-						},
-						"tls_version": {
-							Type:     pluginsdk.TypeString,
-							Optional: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								string(cdn.MinimumTLSVersionTLS10),
-								string(cdn.MinimumTLSVersionTLS12),
-								string(cdn.MinimumTLSVersionNone),
-							}, false),
-							Default: string(cdn.MinimumTLSVersionTLS12),
-						},
-					},
-				},
-				ConflictsWith: []string{"user_managed_https"},
-			},
-
-			"user_managed_https": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				MinItems: 1,
-				MaxItems: 1,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"key_vault_certificate_id": {
-							Type:         pluginsdk.TypeString,
-							Required:     true,
-							ValidateFunc: keyvaultValidate.NestedItemIdWithOptionalVersion,
-						},
-						"tls_version": {
-							Type:     pluginsdk.TypeString,
-							Optional: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								string(cdn.MinimumTLSVersionTLS10),
-								string(cdn.MinimumTLSVersionTLS12),
-								string(cdn.MinimumTLSVersionNone),
-							}, false),
-							Default: string(cdn.MinimumTLSVersionTLS12),
-						},
-					},
-				},
-				ConflictsWith: []string{"cdn_managed_https"},
-			},
-		},
+		Schema: schema,
 	}
 }
 
@@ -168,6 +195,8 @@ func resourceArmCdnEndpointCustomDomainCreate(d *pluginsdk.ResourceData, meta in
 		return fmt.Errorf("waiting for creation of %q: %+v", id, err)
 	}
 
+	d.SetId(id.ID())
+
 	// Enable https if specified
 	var params cdn.BasicCustomDomainHTTPSParameters
 	if v, ok := d.GetOk("user_managed_https"); ok {
@@ -179,7 +208,12 @@ func resourceArmCdnEndpointCustomDomainCreate(d *pluginsdk.ResourceData, meta in
 			return fmt.Errorf("retrieving Cdn Profile %q (Resource Group %q): %+v",
 				id.ResourceGroup, id.ProfileName, err)
 		}
-		if cdnEndpointResp.Sku != nil && (cdnEndpointResp.Sku.Name != cdn.SkuNameStandardMicrosoft && cdnEndpointResp.Sku.Name != cdn.SkuNameStandardVerizon) {
+		supportedSku := map[cdn.SkuName]bool{
+			cdn.SkuNamePremiumVerizon:    true,
+			cdn.SkuNameStandardVerizon:   true,
+			cdn.SkuNameStandardMicrosoft: true,
+		}
+		if cdnEndpointResp.Sku != nil && !supportedSku[cdnEndpointResp.Sku.Name] {
 			return fmt.Errorf("user managed HTTPS certificate is only available for Azure CDN from Microsoft or Azure CDN from Verizon profiles")
 		}
 		params, err = expandArmCdnEndpointCustomDomainUserManagedHttpsSettings(ctx, v.([]interface{}), meta.(*clients.Client))
@@ -195,8 +229,6 @@ func resourceArmCdnEndpointCustomDomainCreate(d *pluginsdk.ResourceData, meta in
 			return err
 		}
 	}
-
-	d.SetId(id.ID())
 
 	return resourceArmCdnEndpointCustomDomainRead(d, meta)
 }
@@ -346,12 +378,21 @@ func resourceArmCdnEndpointCustomDomainRead(d *pluginsdk.ResourceData, meta inte
 		case cdn.UserManagedHTTPSParameters:
 			var isVersioned bool
 			if b := d.Get("user_managed_https").([]interface{}); len(b) == 1 {
-				if certIdRaw := b[0].(map[string]interface{})["key_vault_certificate_id"].(string); certIdRaw != "" {
-					certId, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(certIdRaw)
-					if err != nil {
-						return fmt.Errorf("parsing Key Vault Certificate Id %q: %v", certIdRaw, err)
+				b := b[0].(map[string]interface{})
+
+				secretIdRaw := b["key_vault_secret_id"].(string)
+				if !features.FourPointOhBeta() {
+					if secretIdRaw == "" {
+						secretIdRaw = b["key_vault_certificate_id"].(string)
 					}
-					isVersioned = certId.Version != ""
+				}
+
+				if secretIdRaw != "" {
+					id, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(secretIdRaw)
+					if err != nil {
+						return fmt.Errorf("parsing Key Vault Secret Id %q: %v", secretIdRaw, err)
+					}
+					isVersioned = id.Version != ""
 				}
 			}
 			settings, err := flattenArmCdnEndpointCustomDomainUserManagedHttpsSettings(ctx, params, keyVaultsClient, isVersioned)
@@ -417,31 +458,44 @@ func expandArmCdnEndpointCustomDomainUserManagedHttpsSettings(ctx context.Contex
 
 	raw := input[0].(map[string]interface{})
 
-	keyVaultCertId, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(raw["key_vault_certificate_id"].(string))
+	idLiteral := raw["key_vault_secret_id"].(string)
+	if !features.FourPointOhBeta() {
+		if idLiteral == "" {
+			idLiteral = raw["key_vault_certificate_id"].(string)
+		}
+	}
+
+	keyVaultSecretId, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(idLiteral)
 	if err != nil {
 		return nil, err
 	}
 
-	keyVaultIdRaw, err := clients.KeyVault.KeyVaultIDFromBaseUrl(ctx, clients.Resource, keyVaultCertId.KeyVaultBaseUrl)
+	keyVaultIdRaw, err := clients.KeyVault.KeyVaultIDFromBaseUrl(ctx, clients.Resource, keyVaultSecretId.KeyVaultBaseUrl)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving the Resource ID the Key Vault at URL %q: %s", keyVaultCertId.KeyVaultBaseUrl, err)
+		return nil, fmt.Errorf("retrieving the Resource ID the Key Vault at URL %q: %s", keyVaultSecretId.KeyVaultBaseUrl, err)
 	}
 	if keyVaultIdRaw == nil {
-		return nil, fmt.Errorf("unexpected nil Key Vault ID retrieved at URL %q", keyVaultCertId.KeyVaultBaseUrl)
+		return nil, fmt.Errorf("unexpected nil Key Vault ID retrieved at URL %q", keyVaultSecretId.KeyVaultBaseUrl)
 	}
-	keyVaultId, err := keyvaultParse.VaultID(*keyVaultIdRaw)
+	keyVaultId, err := commonids.ParseKeyVaultID(*keyVaultIdRaw)
 	if err != nil {
 		return nil, err
+	}
+
+	// Fix for issue #20772
+	var SecretVersion *string
+	if keyVaultSecretId.Version != "" {
+		SecretVersion = pointer.To(keyVaultSecretId.Version)
 	}
 
 	output := &cdn.UserManagedHTTPSParameters{
 		CertificateSourceParameters: &cdn.KeyVaultCertificateSourceParameters{
 			OdataType:         utils.String("#Microsoft.Azure.Cdn.Models.KeyVaultCertificateSourceParameters"),
-			SubscriptionID:    &keyVaultId.SubscriptionId,
-			ResourceGroupName: &keyVaultId.ResourceGroup,
-			VaultName:         &keyVaultId.Name,
-			SecretName:        &keyVaultCertId.Name,
-			SecretVersion:     &keyVaultCertId.Version,
+			SubscriptionID:    pointer.To(keyVaultId.SubscriptionId),
+			ResourceGroupName: pointer.To(keyVaultId.ResourceGroupName),
+			VaultName:         pointer.To(keyVaultId.VaultName),
+			SecretName:        pointer.To(keyVaultSecretId.Name),
+			SecretVersion:     SecretVersion,
 			UpdateRule:        utils.String("NoAction"),
 			DeleteRule:        utils.String("NoAction"),
 		},
@@ -499,34 +553,55 @@ func flattenArmCdnEndpointCustomDomainUserManagedHttpsSettings(ctx context.Conte
 		secretVersion = *params.SecretVersion
 	}
 
-	keyVaultId := keyvaultParse.NewVaultID(subscriptionId, resourceGroupName, vaultName)
+	keyVaultId := commonids.NewKeyVaultID(subscriptionId, resourceGroupName, vaultName)
 	keyVaultBaseUrl, err := keyVaultsClient.BaseUriForKeyVault(ctx, keyVaultId)
 	if err != nil {
-		return nil, fmt.Errorf("looking up Key Vault Certificate %q vault url from id %q: %+v", vaultName, keyVaultId, err)
+		return nil, fmt.Errorf("looking up Key Vault Secret %q vault url from id %q: %+v", vaultName, keyVaultId, err)
 	}
-	cert, err := keyVaultsClient.ManagementClient.GetCertificate(ctx, *keyVaultBaseUrl, secretName, secretVersion)
-	if err != nil {
-		return nil, err
-	}
-	if cert.ID == nil {
-		return nil, fmt.Errorf("unexpected null Key Vault Certificate retrieved for Key Vault %s / Secret Name %s / Secret Version %s", keyVaultId, secretName, secretVersion)
-	}
-	certId, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(*cert.ID)
+
+	secret, err := keyVaultsClient.ManagementClient.GetSecret(ctx, *keyVaultBaseUrl, secretName, secretVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	certIdLiteral := certId.ID()
+	if secret.ID == nil {
+		return nil, fmt.Errorf("unexpected null Key Vault Secret retrieved for Key Vault %s / Secret Name %s / Secret Version %s", keyVaultId, secretName, secretVersion)
+	}
+
+	secretId, err := keyvaultParse.ParseOptionallyVersionedNestedItemID(*secret.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	secretIdLiteral := secretId.ID()
 	if !isVersioned {
-		certIdLiteral = certId.VersionlessID()
+		secretIdLiteral = secretId.VersionlessID()
 	}
 
-	return []interface{}{
-		map[string]interface{}{
-			"key_vault_certificate_id": certIdLiteral,
-			"tls_version":              string(input.MinimumTLSVersion),
-		},
-	}, nil
+	m := map[string]interface{}{
+		"key_vault_secret_id": secretIdLiteral,
+		"tls_version":         string(input.MinimumTLSVersion),
+	}
+
+	if features.FourPointOhBeta() {
+		return []interface{}{m}, nil
+	}
+
+	// We try to retrieve the certificate with the given secret name and version. If it returns error, then we tolerate the error and simply setting empty string for the certificate id.
+	// As in this case, the users might be using a secret rather than a certificate.
+	var certIdLiteral string
+	cert, err := keyVaultsClient.ManagementClient.GetCertificate(ctx, *keyVaultBaseUrl, secretName, secretVersion)
+	if err == nil && cert.ID != nil {
+		certId, _ := keyvaultParse.ParseOptionallyVersionedNestedItemID(*cert.ID)
+		certIdLiteral = certId.ID()
+		if !isVersioned {
+			certIdLiteral = certId.VersionlessID()
+		}
+	}
+
+	m["key_vault_certificate_id"] = certIdLiteral
+
+	return []interface{}{m}, nil
 }
 
 func enableArmCdnEndpointCustomDomainHttps(ctx context.Context, client *cdn.CustomDomainsClient, id parse.CustomDomainId, params cdn.BasicCustomDomainHTTPSParameters) error {

@@ -1,39 +1,63 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package client
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/mariadb/mgmt/2018-06-01/mariadb"
+	"fmt"
+
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mariadb/2018-06-01/configurations"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mariadb/2018-06-01/databases"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mariadb/2018-06-01/firewallrules"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mariadb/2018-06-01/servers"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/mariadb/2018-06-01/virtualnetworkrules"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/common"
 )
 
 type Client struct {
-	ConfigurationsClient      *mariadb.ConfigurationsClient
-	DatabasesClient           *mariadb.DatabasesClient
-	FirewallRulesClient       *mariadb.FirewallRulesClient
-	ServersClient             *mariadb.ServersClient
-	VirtualNetworkRulesClient *mariadb.VirtualNetworkRulesClient
+	ConfigurationsClient      *configurations.ConfigurationsClient
+	DatabasesClient           *databases.DatabasesClient
+	FirewallRulesClient       *firewallrules.FirewallRulesClient
+	ServersClient             *servers.ServersClient
+	VirtualNetworkRulesClient *virtualnetworkrules.VirtualNetworkRulesClient
 }
 
-func NewClient(o *common.ClientOptions) *Client {
-	configurationsClient := mariadb.NewConfigurationsClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
-	o.ConfigureClient(&configurationsClient.Client, o.ResourceManagerAuthorizer)
+func NewClient(o *common.ClientOptions) (*Client, error) {
+	configurationsClient, err := configurations.NewConfigurationsClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Configurations Client: %+v", err)
+	}
+	o.Configure(configurationsClient.Client, o.Authorizers.ResourceManager)
 
-	DatabasesClient := mariadb.NewDatabasesClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
-	o.ConfigureClient(&DatabasesClient.Client, o.ResourceManagerAuthorizer)
+	databasesClient, err := databases.NewDatabasesClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Databases Client: %+v", err)
+	}
+	o.Configure(databasesClient.Client, o.Authorizers.ResourceManager)
 
-	FirewallRulesClient := mariadb.NewFirewallRulesClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
-	o.ConfigureClient(&FirewallRulesClient.Client, o.ResourceManagerAuthorizer)
+	firewallRulesClient, err := firewallrules.NewFirewallRulesClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Firewall Rules Client: %+v", err)
+	}
+	o.Configure(firewallRulesClient.Client, o.Authorizers.ResourceManager)
 
-	ServersClient := mariadb.NewServersClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
-	o.ConfigureClient(&ServersClient.Client, o.ResourceManagerAuthorizer)
+	serversClient, err := servers.NewServersClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Servers Client: %+v", err)
+	}
+	o.Configure(serversClient.Client, o.Authorizers.ResourceManager)
 
-	VirtualNetworkRulesClient := mariadb.NewVirtualNetworkRulesClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
-	o.ConfigureClient(&VirtualNetworkRulesClient.Client, o.ResourceManagerAuthorizer)
+	virtualNetworkRulesClient, err := virtualnetworkrules.NewVirtualNetworkRulesClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Virtual Network Rules Client: %+v", err)
+	}
+	o.Configure(virtualNetworkRulesClient.Client, o.Authorizers.ResourceManager)
 
 	return &Client{
-		ConfigurationsClient:      &configurationsClient,
-		DatabasesClient:           &DatabasesClient,
-		FirewallRulesClient:       &FirewallRulesClient,
-		ServersClient:             &ServersClient,
-		VirtualNetworkRulesClient: &VirtualNetworkRulesClient,
-	}
+		ConfigurationsClient:      configurationsClient,
+		DatabasesClient:           databasesClient,
+		FirewallRulesClient:       firewallRulesClient,
+		ServersClient:             serversClient,
+		VirtualNetworkRulesClient: virtualNetworkRulesClient,
+	}, nil
 }

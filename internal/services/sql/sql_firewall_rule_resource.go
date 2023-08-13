@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package sql
 
 import (
@@ -5,11 +8,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql"
-	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql" // nolint: staticcheck
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/sql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
@@ -25,7 +27,7 @@ func resourceSqlFirewallRule() *pluginsdk.Resource {
 		Update: resourceSqlFirewallRuleCreateUpdate,
 		Delete: resourceSqlFirewallRuleDelete,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_sql_firewall_rule` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_firewall_rule` resource instead."),
+		DeprecationMessage: "The `azurerm_sql_firewall_rule` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_firewall_rule` resource instead.",
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
 			_, err := parse.FirewallRuleID(id)
@@ -46,7 +48,7 @@ func resourceSqlFirewallRule() *pluginsdk.Resource {
 				ForceNew: true,
 			},
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"server_name": {
 				Type:         pluginsdk.TypeString,

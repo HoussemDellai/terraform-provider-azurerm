@@ -1,14 +1,17 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package sql
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql"
+	"github.com/Azure/azure-sdk-for-go/services/preview/sql/mgmt/2017-03-01-preview/sql" // nolint: staticcheck
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/mssql/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/sql/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
@@ -25,7 +28,7 @@ func resourceSqlElasticPool() *pluginsdk.Resource {
 		Update: resourceSqlElasticPoolCreateUpdate,
 		Delete: resourceSqlElasticPoolDelete,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_sql_elasticpool_resource` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_elasticpool` resource instead."),
+		DeprecationMessage: "The `azurerm_sql_elasticpool_resource` resource is deprecated and will be removed in version 4.0 of the AzureRM provider. Please use the `azurerm_mssql_elasticpool` resource instead.",
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
 			_, err := parse.ElasticPoolID(id)
@@ -46,9 +49,9 @@ func resourceSqlElasticPool() *pluginsdk.Resource {
 				ForceNew: true,
 			},
 
-			"location": azure.SchemaLocation(),
+			"location": commonschema.Location(),
 
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			"resource_group_name": commonschema.ResourceGroupName(),
 
 			"server_name": {
 				Type:         pluginsdk.TypeString,

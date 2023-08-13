@@ -1,17 +1,22 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package keyvault_test
 
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/keyvault/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/keyvault/7.4/keyvault"
 )
 
 type KeyVaultSecretResource struct{}
@@ -26,6 +31,8 @@ func TestAccKeyVaultSecret_basic(t *testing.T) {
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 				check.That(data.ResourceName).Key("value").HasValue("rick-and-morty"),
+				check.That(data.ResourceName).Key("resource_id").MatchesRegex(regexp.MustCompile(`^/subscriptions/[\w-]+/resourceGroups/[\w-]+/providers/Microsoft.KeyVault/vaults/[\w-]+/secrets/[\w-]+/versions/[\w-]+$`)),
+				check.That(data.ResourceName).Key("resource_versionless_id").MatchesRegex(regexp.MustCompile(`^/subscriptions/[\w-]+/resourceGroups/[\w-]+/providers/Microsoft.KeyVault/vaults/[\w-]+/secrets/[\w-]+$`)),
 			),
 		},
 		data.ImportStep(),
@@ -229,7 +236,7 @@ func (KeyVaultSecretResource) Exists(ctx context.Context, clients *clients.Clien
 	if err != nil || keyVaultIdRaw == nil {
 		return nil, fmt.Errorf("retrieving the Resource ID the Key Vault at URL %q: %s", id.KeyVaultBaseUrl, err)
 	}
-	keyVaultId, err := parse.VaultID(*keyVaultIdRaw)
+	keyVaultId, err := commonids.ParseKeyVaultID(*keyVaultIdRaw)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +259,7 @@ func (KeyVaultSecretResource) Destroy(ctx context.Context, client *clients.Clien
 	dataPlaneClient := client.KeyVault.ManagementClient
 
 	name := state.Attributes["name"]
-	keyVaultId, err := parse.VaultID(state.Attributes["key_vault_id"])
+	keyVaultId, err := commonids.ParseKeyVaultID(state.Attributes["key_vault_id"])
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +293,7 @@ func (r KeyVaultSecretResource) updateSecretValue(value string) acceptance.Clien
 		dataPlaneClient := clients.KeyVault.ManagementClient
 
 		name := state.Attributes["name"]
-		keyVaultId, err := parse.VaultID(state.Attributes["key_vault_id"])
+		keyVaultId, err := commonids.ParseKeyVaultID(state.Attributes["key_vault_id"])
 		if err != nil {
 			return err
 		}
@@ -553,6 +560,7 @@ resource "azurerm_key_vault" "test" {
       "Recover",
       "Set",
     ]
+
   }
 
   tags = {

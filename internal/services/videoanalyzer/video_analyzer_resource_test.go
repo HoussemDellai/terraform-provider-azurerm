@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package videoanalyzer_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/videoanalyzer/2021-05-01-preview/videoanalyzers"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/videoanalyzer/sdk/2021-05-01-preview/videoanalyzer"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -16,6 +19,7 @@ import (
 type VideoAnalyzerResource struct{}
 
 func TestAccVideoAnalyzer_basic(t *testing.T) {
+	t.Skip("Skipping as video analyzer is deprecated")
 	data := acceptance.BuildTestData(t, "azurerm_video_analyzer", "test")
 	r := VideoAnalyzerResource{}
 
@@ -33,6 +37,7 @@ func TestAccVideoAnalyzer_basic(t *testing.T) {
 }
 
 func TestAccVideoAnalyzer_requiresImport(t *testing.T) {
+	t.Skip("Skipping as video analyzer is deprecated")
 	data := acceptance.BuildTestData(t, "azurerm_video_analyzer", "test")
 	r := VideoAnalyzerResource{}
 
@@ -49,6 +54,7 @@ func TestAccVideoAnalyzer_requiresImport(t *testing.T) {
 }
 
 func TestAccVideoAnalyzer_complete(t *testing.T) {
+	t.Skip("Skipping as video analyzer is deprecated")
 	data := acceptance.BuildTestData(t, "azurerm_video_analyzer", "test")
 	r := VideoAnalyzerResource{}
 
@@ -67,7 +73,7 @@ func TestAccVideoAnalyzer_complete(t *testing.T) {
 }
 
 func (VideoAnalyzerResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := videoanalyzer.ParseVideoAnalyzerID(state.ID)
+	id, err := videoanalyzers.ParseVideoAnalyzerID(state.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +86,8 @@ func (VideoAnalyzerResource) Exists(ctx context.Context, clients *clients.Client
 	return utils.Bool(resp.Model != nil), nil
 }
 
+//nolint:unused
 func (r VideoAnalyzerResource) basic(data acceptance.TestData) string {
-	template := r.template(data)
 	return fmt.Sprintf(`
 %s
 
@@ -107,11 +113,11 @@ resource "azurerm_video_analyzer" "test" {
     azurerm_role_assignment.reader,
   ]
 }
-`, template, data.RandomString)
+`, r.template(data), data.RandomString)
 }
 
+//nolint:unused
 func (r VideoAnalyzerResource) requiresImport(data acceptance.TestData) string {
-	template := r.basic(data)
 	return fmt.Sprintf(`
 %s
 
@@ -132,11 +138,11 @@ resource "azurerm_video_analyzer" "import" {
     ]
   }
 }
-`, template)
+`, r.template(data))
 }
 
+//nolint:unused
 func (r VideoAnalyzerResource) complete(data acceptance.TestData) string {
-	template := r.template(data)
 	return fmt.Sprintf(`
 %s
 
@@ -166,9 +172,10 @@ resource "azurerm_video_analyzer" "test" {
     label = "test"
   }
 }
-`, template, data.RandomString)
+`, r.template(data), data.RandomString)
 }
 
+//nolint:unused
 func (VideoAnalyzerResource) template(data acceptance.TestData) string {
 	return fmt.Sprintf(`
 provider "azurerm" {

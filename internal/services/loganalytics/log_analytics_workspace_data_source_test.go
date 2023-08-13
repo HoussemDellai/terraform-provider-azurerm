@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package loganalytics_test
 
 import (
@@ -10,6 +13,7 @@ import (
 
 type LogAnalyticsWorkspaceDataSource struct{}
 
+// NOTE: The RP lowercases the sku return value which is why the tests fail
 func TestAccDataSourceLogAnalyticsWorkspace_basic(t *testing.T) {
 	data := acceptance.BuildTestData(t, "data.azurerm_log_analytics_workspace", "test")
 	r := LogAnalyticsWorkspaceDataSource{}

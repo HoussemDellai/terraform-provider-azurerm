@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package appservice_test
 
 import (
@@ -97,6 +100,32 @@ func TestAccServicePlan_completeUpdate(t *testing.T) {
 	})
 }
 
+func TestAccServicePlan_maxElasticWorkerCountForAllSupportedSku(t *testing.T) {
+	for _, sku := range []string{"WS1", "EP1"} {
+		t.Run(sku, func(t *testing.T) {
+			data := acceptance.BuildTestData(t, "azurerm_service_plan", "test")
+			r := ServicePlanResource{}
+
+			data.ResourceTest(t, r, []acceptance.TestStep{
+				{
+					Config: r.maxElasticWorkerCountWithSku(data, 5, sku),
+					Check: acceptance.ComposeTestCheckFunc(
+						check.That(data.ResourceName).ExistsInAzure(r),
+					),
+				},
+				data.ImportStep(),
+				{
+					Config: r.maxElasticWorkerCountWithSku(data, 10, sku),
+					Check: acceptance.ComposeTestCheckFunc(
+						check.That(data.ResourceName).ExistsInAzure(r),
+					),
+				},
+				data.ImportStep(),
+			})
+		})
+	}
+}
+
 func TestAccServicePlan_maxElasticWorkerCount(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_service_plan", "test")
 	r := ServicePlanResource{}
@@ -111,6 +140,21 @@ func TestAccServicePlan_maxElasticWorkerCount(t *testing.T) {
 		data.ImportStep(),
 		{
 			Config: r.maxElasticWorkerCount(data, 10),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccServicePlan_memoryOptimized(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_service_plan", "test")
+	r := ServicePlanResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.memoryOptimized(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -326,6 +370,63 @@ resource "azurerm_service_plan" "test" {
 `, data.RandomInteger, data.Locations.Primary, count)
 }
 
+func (r ServicePlanResource) maxElasticWorkerCountWithSku(data acceptance.TestData, count int, sku string) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-appserviceplan-%[1]d"
+  location = "%s"
+}
+
+resource "azurerm_service_plan" "test" {
+  name                         = "acctest-SP-%[1]d"
+  resource_group_name          = azurerm_resource_group.test.name
+  location                     = azurerm_resource_group.test.location
+  sku_name                     = "%[3]s"
+  os_type                      = "Linux"
+  maximum_elastic_worker_count = %[4]d
+
+  tags = {
+    environment = "AccTest"
+    Foo         = "bar"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, sku, count)
+}
+
+func (r ServicePlanResource) memoryOptimized(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-appserviceplan-%[1]d"
+  location = "%s"
+}
+
+resource "azurerm_service_plan" "test" {
+  name                     = "acctest-SP-%[1]d"
+  resource_group_name      = azurerm_resource_group.test.name
+  location                 = azurerm_resource_group.test.location
+  sku_name                 = "P1mv3"
+  os_type                  = "Linux"
+  per_site_scaling_enabled = true
+  worker_count             = 3
+
+  zone_balancing_enabled = true
+
+  tags = {
+    environment = "AccTest"
+    Foo         = "bar"
+  }
+}
+`, data.RandomInteger, data.Locations.Secondary)
+}
+
 func (r ServicePlanResource) aseV2(data acceptance.TestData) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
@@ -430,6 +531,67 @@ resource "azurerm_service_plan" "test" {
   resource_group_name = azurerm_resource_group.test.name
   location            = azurerm_resource_group.test.location
   os_type             = "Windows"
+  sku_name            = "I1v2"
+
+  app_service_environment_id = azurerm_app_service_environment_v3.test.id
+
+  tags = {
+    environment = "AccTest"
+    Foo         = "bar"
+  }
+}
+`, data.RandomInteger, data.Locations.Primary)
+}
+
+func (r ServicePlanResource) aseV3Linux(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-appserviceplan-%[1]d"
+  location = "%[2]s"
+}
+
+resource "azurerm_resource_group" "test2" {
+  name     = "acctestRG2-ase-%[1]d"
+  location = "%[2]s"
+}
+
+
+resource "azurerm_virtual_network" "test" {
+  name                = "acctest-vnet-%[1]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  address_space       = ["10.0.0.0/16"]
+}
+
+resource "azurerm_subnet" "test" {
+  name                 = "acctest-subnet-%[1]d"
+  resource_group_name  = azurerm_resource_group.test.name
+  virtual_network_name = azurerm_virtual_network.test.name
+  address_prefixes     = ["10.0.2.0/24"]
+  delegation {
+    name = "asedelegation"
+    service_delegation {
+      name    = "Microsoft.Web/hostingEnvironments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
+resource "azurerm_app_service_environment_v3" "test" {
+  name                = "acctest-ase-%[1]d"
+  resource_group_name = azurerm_resource_group.test.name
+  subnet_id           = azurerm_subnet.test.id
+}
+
+resource "azurerm_service_plan" "test" {
+  name                = "acctest-SP-%[1]d"
+  resource_group_name = azurerm_resource_group.test.name
+  location            = azurerm_resource_group.test.location
+  os_type             = "Linux"
   sku_name            = "I1v2"
 
   app_service_environment_id = azurerm_app_service_environment_v3.test.id

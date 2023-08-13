@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package containers
 
 import (
@@ -52,6 +55,14 @@ func SchemaContainerGroupProbe() *pluginsdk.Schema {
 									"Http",
 									"Https",
 								}, false),
+							},
+							"http_headers": {
+								Type:     pluginsdk.TypeMap,
+								Optional: true,
+								ForceNew: true,
+								Elem: &pluginsdk.Schema{
+									Type: pluginsdk.TypeString,
+								},
 							},
 						},
 					},

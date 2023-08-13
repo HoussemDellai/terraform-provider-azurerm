@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import (
@@ -15,7 +18,7 @@ func OrchestratedVirtualMachineScaleSetSku(input interface{}, key string) (warni
 	skuParts := strings.Split(v, "_")
 
 	if len(skuParts) < 2 || strings.Contains(v, "__") || strings.Contains(v, " ") {
-		errors = append(errors, fmt.Errorf("%q(%q) is not formatted properly.", key, v))
+		errors = append(errors, fmt.Errorf("%q is not formatted properly, got %q", key, v))
 	}
 
 	return

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package bot_test
 
 import (
@@ -5,7 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/botservice/mgmt/2021-03-01/botservice"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/bot/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/botservice/2021-05-01-preview/botservice"
 )
 
 type BotChannelAlexaResource struct{}
@@ -36,7 +39,7 @@ func testAccBotChannelAlexa_requiresImport(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_bot_channel_alexa", "test")
 	r := BotChannelAlexaResource{}
 
-	data.ResourceTest(t, r, []acceptance.TestStep{
+	data.ResourceSequentialTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.basic(data),
 			Check: acceptance.ComposeTestCheckFunc(

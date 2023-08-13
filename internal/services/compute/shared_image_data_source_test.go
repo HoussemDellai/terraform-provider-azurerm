@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package compute_test
 
 import (
@@ -46,6 +49,9 @@ func TestAccDataSourceAzureRMSharedImage_complete(t *testing.T) {
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).Key("tags.%").HasValue("0"),
 				check.That(data.ResourceName).Key("hyper_v_generation").HasValue("V1"),
+				check.That(data.ResourceName).Key("purchase_plan.0.name").HasValue("AccTestPlan"),
+				check.That(data.ResourceName).Key("purchase_plan.0.publisher").HasValue("AccTestPlanPublisher"),
+				check.That(data.ResourceName).Key("purchase_plan.0.product").HasValue("AccTestPlanProduct"),
 			),
 		},
 	})
@@ -60,7 +66,7 @@ data "azurerm_shared_image" "test" {
   gallery_name        = azurerm_shared_image.test.gallery_name
   resource_group_name = azurerm_shared_image.test.resource_group_name
 }
-`, SharedImageResource{}.basic(data, hyperVGen))
+`, SharedImageResource{}.basicWithHyperVGen(data, hyperVGen))
 }
 
 func (SharedImageDataSource) complete(data acceptance.TestData, hyperVGen string) string {
@@ -72,5 +78,5 @@ data "azurerm_shared_image" "test" {
   gallery_name        = azurerm_shared_image.test.gallery_name
   resource_group_name = azurerm_shared_image.test.resource_group_name
 }
-`, SharedImageResource{}.complete(data, hyperVGen))
+`, SharedImageResource{}.completeWithHyperVGen(data, hyperVGen))
 }

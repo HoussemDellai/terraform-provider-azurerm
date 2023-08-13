@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import "testing"
@@ -39,9 +42,19 @@ func TestApimSkuName(t *testing.T) {
 			valid: false,
 		},
 		{
-			name:  "Premium_11",
-			input: "Premium_11",
+			name:  "Premium_101",
+			input: "Premium_101",
 			valid: false,
+		},
+		{
+			name:  "Premium_10",
+			input: "Premium_10",
+			valid: true,
+		},
+		{
+			name:  "Premium_12",
+			input: "Premium_12",
+			valid: true,
 		},
 		{
 			name:  "Premium_7",

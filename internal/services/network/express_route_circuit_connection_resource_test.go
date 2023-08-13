@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network_test
 
 import (
@@ -176,7 +179,7 @@ resource "azurerm_express_route_port" "test" {
   name                = "acctest-erp-%d"
   resource_group_name = azurerm_resource_group.test.name
   location            = azurerm_resource_group.test.location
-  peering_location    = "Equinix-Seattle-SE2"
+  peering_location    = "Airtel-Chennai2-CLS"
   bandwidth_in_gbps   = 10
   encapsulation       = "Dot1Q"
 }

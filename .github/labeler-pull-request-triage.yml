@@ -33,13 +33,19 @@ service/attestation:
 
 service/authorization:
   - internal/services/authorization/**/*
-  - internal/services/msi/**/*
+  - internal/services/managedidentity/**/*
+
+service/automanage:
+  - internal/services/automanage/**/*
 
 service/automation:
   - internal/services/automation/**/*
 
 service/azure-stack-hci:
   - internal/services/azurestackhci/**/*
+
+service/azuremanagedlustrefilesystem:
+  - internal/services/azuremanagedlustrefilesystem/**/*
 
 service/batch:
   - internal/services/batch/**/*
@@ -62,8 +68,14 @@ service/cognitive-services:
 service/communication:
   - internal/services/communication/**/*
 
+service/connections:
+  - internal/services/connections/**/*
+
 service/consumption:
   - internal/services/consumption/**/*
+
+service/container-apps:
+  - internal/services/containerapps/**/*
 
 service/cosmosdb:
   - internal/services/cosmos/**/*
@@ -73,6 +85,9 @@ service/cost-management:
 
 service/custom-resource-provider:
   - internal/services/customproviders/**/*
+
+service/dashboard:
+  - internal/services/dashboard/**/*
 
 service/data-factory:
   - internal/services/datafactory/**/*
@@ -91,6 +106,9 @@ service/databox-edge:
 
 service/databricks:
   - internal/services/databricks/**/*
+
+service/datadog:
+  - internal/services/datadog/**/*
 
 service/devtestlabs:
   - internal/services/devtestlabs/**/*
@@ -120,8 +138,14 @@ service/event-hubs:
 service/firewall:
   - internal/services/firewall/**/*
 
+service/fluid-relay:
+  - internal/services/fluidrelay/**/*
+
 service/frontdoor:
   - internal/services/frontdoor/**/*
+
+service/graph:
+  - internal/services/graphservices/**/*
 
 service/hdinsight:
   - internal/services/hdinsight/**/*
@@ -134,6 +158,9 @@ service/hpc-cache:
 
 service/hsm:
   - internal/services/hsm/**/*
+
+service/hybrid-compute:
+  - internal/services/hybridcompute/**/*
 
 service/iot-central:
   - internal/services/iotcentral/**/*
@@ -150,6 +177,9 @@ service/key-vault:
 service/kusto:
   - internal/services/kusto/**/*
 
+service/labservice:
+  - internal/services/labservice/**/*
+
 service/lighthouse:
   - internal/services/lighthouse/**/*
 
@@ -157,7 +187,7 @@ service/load-balancers:
   - internal/services/loadbalancer/**/*
 
 service/load-test:
-  - internal/services/loadtest/**/*
+  - internal/services/loadtestservice/**/*
 
 service/log-analytics:
   - internal/services/loganalytics/**/*
@@ -192,11 +222,17 @@ service/media:
 service/mixed-reality:
   - internal/services/mixedreality/**/*
 
+service/mobile-network:
+  - internal/services/mobilenetwork/**/*
+
 service/monitor:
   - internal/services/monitor/**/*
 
 service/mssql:
   - internal/services/mssql/**/*
+
+service/mssqlmanagedinstance:
+  - internal/services/mssqlmanagedinstance/**/*
 
 service/mysql:
   - internal/services/mysql/**/*
@@ -204,8 +240,20 @@ service/mysql:
 service/netapp:
   - internal/services/netapp/**/*
 
+service/network:
+  - internal/services/network/**/*
+
+service/network-function:
+  - internal/services/networkfunction/**/*
+
+service/nginx:
+  - internal/services/nginx/**/*
+
 service/notifications:
   - internal/services/notificationhub/**/*
+
+service/orbital:
+  - internal/services/orbital/**/*
 
 service/policy:
   - internal/services/policy/**/*
@@ -218,6 +266,9 @@ service/postgresql:
 
 service/power-bi:
   - internal/services/powerbi/**/*
+
+service/private-dns-resolver:
+  - internal/services/privatednsresolver/**/*
 
 service/purview:
   - internal/services/purview/**/*
@@ -244,6 +295,9 @@ service/sentinel:
 service/service-bus:
   - internal/services/servicebus/**/*
 
+service/service-connector:
+  - internal/services/serviceconnector/**/*
+
 service/service-fabric:
   - internal/services/servicefabric/**/*
 
@@ -261,6 +315,9 @@ service/sql:
 
 service/storage:
   - internal/services/storage/**/*
+
+service/storagemover:
+  - internal/services/storagemover/**/*
 
 service/stream-analytics:
   - internal/services/streamanalytics/**/*

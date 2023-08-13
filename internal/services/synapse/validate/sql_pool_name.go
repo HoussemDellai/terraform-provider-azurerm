@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import (
@@ -17,7 +20,7 @@ func SqlPoolName(i interface{}, k string) (warnings []string, errors []error) {
 	// 2. can't end with '.' or ' '
 	// 3. The value must be between 1 and 60 characters long
 	if !regexp.MustCompile(`^[^<>*%&:\\\/?@-]{0,59}[^\s.<>*%&:\\\/?@-]$`).MatchString(v) {
-		errors = append(errors, fmt.Errorf("%s can contain only letters, numbers or underscore, The value must be between 1 and 15 characters long", k))
+		errors = append(errors, fmt.Errorf("%s can contain only letters, numbers or underscore, The value must be between 1 and 60 characters long", k))
 		return
 	}
 

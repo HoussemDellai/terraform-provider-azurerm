@@ -24,16 +24,15 @@ resource "azurerm_data_factory" "example" {
   resource_group_name = azurerm_resource_group.example.name
 }
 
-resource "azurerm_data_factory_pipeline" "test" {
-  name                = "example"
-  resource_group_name = azurerm_resource_group.test.name
-  data_factory_id     = azurerm_data_factory.test.id
+resource "azurerm_data_factory_pipeline" "example" {
+  name            = "example"
+  data_factory_id = azurerm_data_factory.example.id
 }
 
-resource "azurerm_data_factory_trigger_schedule" "test" {
+resource "azurerm_data_factory_trigger_schedule" "example" {
   name            = "example"
-  data_factory_id = azurerm_data_factory.test.id
-  pipeline_name   = azurerm_data_factory_pipeline.test.name
+  data_factory_id = azurerm_data_factory.example.id
+  pipeline_name   = azurerm_data_factory_pipeline.example.name
 
   interval  = 5
   frequency = "Day"
@@ -48,21 +47,25 @@ The following arguments are supported:
 
 * `data_factory_id` - (Required) The Data Factory ID in which to associate the Linked Service with. Changing this forces a new resource.
 
-* `pipeline_name` - (Required) The Data Factory Pipeline name that the trigger will act on.
-
 * `description` - (Optional) The Schedule Trigger's description.
 
 * `schedule` - (Optional) A `schedule` block as defined below, which further specifies the recurrence schedule for the trigger. A schedule is capable of limiting or increasing the number of trigger executions specified by the `frequency` and `interval` properties.
 
 * `start_time` - (Optional) The time the Schedule Trigger will start. This defaults to the current time. The time will be represented in UTC.
 
+* `time_zone` - (Optional) The timezone of the start/end time.
+
 * `end_time` - (Optional) The time the Schedule Trigger should end. The time will be represented in UTC.
 
-* `interval` - (Optional) The interval for how often the trigger occurs. This defaults to 1.
+* `interval` - (Optional) The interval for how often the trigger occurs. This defaults to `1`.
 
 * `frequency` - (Optional) The trigger frequency. Valid values include `Minute`, `Hour`, `Day`, `Week`, `Month`. Defaults to `Minute`.
 
 * `activated` - (Optional) Specifies if the Data Factory Schedule Trigger is activated. Defaults to `true`.
+
+* `pipeline` - (Optional) block as defined below.
+
+* `pipeline_name` - (Optional) The Data Factory Pipeline name that the trigger will act on.
 
 * `pipeline_parameters` - (Optional) The pipeline parameters that the trigger will act upon.
 
@@ -90,15 +93,23 @@ A `monthly` block supports the following:
 
 * `week` - (Optional) The occurrence of the specified day during the month. For example, a `monthly` property with `weekday` and `week` values of `Sunday, -1` means the last Sunday of the month.
 
+---
+
+A `pipeline` block supports the following:
+
+* `name` - (Required) Reference pipeline name.
+
+* `parameters` - (Optional) The pipeline parameters that the trigger will act upon.
+
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Data Factory Schedule Trigger.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Data Factory Schedule Trigger.
 * `update` - (Defaults to 30 minutes) Used when updating the Data Factory Schedule Trigger.
@@ -110,5 +121,5 @@ The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/d
 Data Factory Schedule Trigger can be imported using the `resource id`, e.g.
 
 ```shell
-terraform import azurerm_data_factory_schedule_trigger.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example/providers/Microsoft.DataFactory/factories/example/triggers/example
+terraform import azurerm_data_factory_trigger_schedule.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example/providers/Microsoft.DataFactory/factories/example/triggers/example
 ```

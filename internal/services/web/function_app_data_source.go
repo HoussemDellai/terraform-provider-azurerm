@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package web
 
 import (
@@ -5,12 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/web/mgmt/2021-02-01/web"
+	"github.com/Azure/azure-sdk-for-go/services/web/mgmt/2021-02-01/web" // nolint: staticcheck
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/identity"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/features"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/web/parse"
 	webValidate "github.com/hashicorp/terraform-provider-azurerm/internal/services/web/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
@@ -23,7 +25,7 @@ func dataSourceFunctionApp() *pluginsdk.Resource {
 	return &pluginsdk.Resource{
 		Read: dataSourceFunctionAppRead,
 
-		DeprecationMessage: features.DeprecatedInThreePointOh("The `azurerm_function_app` data source has been superseded by the `azurerm_linux_function_app` and `azurerm_windows_function_app` data sources. Whilst this resource will continue to be available in the 2.x and 3.x releases it is feature-frozen for compatibility purposes, will no longer receive any updates and will be removed in a future major release of the Azure Provider."),
+		DeprecationMessage: "The `azurerm_function_app` data source has been superseded by the `azurerm_linux_function_app` and `azurerm_windows_function_app` data sources. Whilst this resource will continue to be available in the 2.x and 3.x releases it is feature-frozen for compatibility purposes, will no longer receive any updates and will be removed in a future major release of the Azure Provider.",
 
 		Timeouts: &pluginsdk.ResourceTimeout{
 			Read: pluginsdk.DefaultTimeout(5 * time.Minute),

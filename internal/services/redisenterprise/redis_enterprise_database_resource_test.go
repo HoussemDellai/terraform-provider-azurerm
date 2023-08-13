@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package redisenterprise_test
 
 import (
@@ -6,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-azure-helpers/lang/response"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/redisenterprise/2022-01-01/databases"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/redisenterprise/sdk/2022-01-01/databases"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -92,6 +95,20 @@ func TestRedisEnterpriseDatabase_geoDatabaseModule(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.geoDatabasewithModuleEnabled(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestRedisEnterpriseDatabase_geoDatabaseWithRedisJsonModule(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_redis_enterprise_database", "test")
+	r := RedisenterpriseDatabaseResource{}
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.geoDatabasewithRedisJsonModuleEnabled(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -229,6 +246,11 @@ resource "azurerm_redis_enterprise_database" "test" {
     args = "RETENTION_POLICY 20"
   }
 
+  module {
+    name = "RedisJSON"
+    args = ""
+  }
+
   port = 10000
 }
 `, template)
@@ -311,6 +333,31 @@ resource "azurerm_redis_enterprise_database" "test" {
   eviction_policy   = "NoEviction"
   module {
     name = "RediSearch"
+    args = ""
+  }
+  linked_database_id = [
+    "${azurerm_redis_enterprise_cluster.test.id}/databases/default",
+    "${azurerm_redis_enterprise_cluster.test1.id}/databases/default",
+    "${azurerm_redis_enterprise_cluster.test2.id}/databases/default"
+  ]
+
+  linked_database_group_nickname = "tftestGeoGroup"
+}
+`, r.template(data))
+}
+
+func (r RedisenterpriseDatabaseResource) geoDatabasewithRedisJsonModuleEnabled(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+resource "azurerm_redis_enterprise_database" "test" {
+  cluster_id          = azurerm_redis_enterprise_cluster.test.id
+  resource_group_name = azurerm_resource_group.test.name
+
+  client_protocol   = "Encrypted"
+  clustering_policy = "EnterpriseCluster"
+  eviction_policy   = "NoEviction"
+  module {
+    name = "RedisJSON"
     args = ""
   }
   linked_database_id = [

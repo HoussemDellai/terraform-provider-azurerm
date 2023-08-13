@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package network
 
 import (
@@ -62,7 +65,7 @@ func dataSourcePublicIpPrefixRead(d *pluginsdk.ResourceData, meta interface{}) e
 	defer cancel()
 
 	id := parse.NewPublicIpPrefixID(subscriptionId, d.Get("resource_group_name").(string), d.Get("name").(string))
-	resp, err := client.Get(ctx, id.ResourceGroup, id.PublicIPPrefixeName, "")
+	resp, err := client.Get(ctx, id.ResourceGroup, id.Name, "")
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
 			return fmt.Errorf("%s was not found", id)
@@ -73,7 +76,7 @@ func dataSourcePublicIpPrefixRead(d *pluginsdk.ResourceData, meta interface{}) e
 	d.SetId(id.ID())
 
 	d.Set("location", location.NormalizeNilable(resp.Location))
-	d.Set("zones", zones.Flatten(resp.Zones))
+	d.Set("zones", zones.FlattenUntyped(resp.Zones))
 
 	if sku := resp.Sku; sku != nil {
 		d.Set("sku", string(sku.Name))

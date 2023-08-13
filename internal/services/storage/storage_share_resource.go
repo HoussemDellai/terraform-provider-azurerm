@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package storage
 
 import (
@@ -123,11 +126,15 @@ func resourceStorageShare() *pluginsdk.Resource {
 
 			"access_tier": {
 				Type:     pluginsdk.TypeString,
+				Computed: true,
 				Optional: true,
 				ValidateFunc: validation.StringInSlice(
-					[]string{string(shares.HotAccessTier),
+					[]string{
+						string(shares.PremiumAccessTier),
+						string(shares.HotAccessTier),
 						string(shares.CoolAccessTier),
-						string(shares.TransactionOptimizedAccessTier)}, false),
+						string(shares.TransactionOptimizedAccessTier),
+					}, false),
 			},
 		},
 	}

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package springcloud
 
 import (
@@ -5,15 +8,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/appplatform/mgmt/2022-03-01-preview/appplatform"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/services/springcloud/migration"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/springcloud/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/springcloud/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
+	"github.com/tombuildsstuff/kermit/sdk/appplatform/2023-05-01-preview/appplatform"
 )
 
 func resourceSpringCloudConfigurationService() *pluginsdk.Resource {
@@ -22,6 +26,11 @@ func resourceSpringCloudConfigurationService() *pluginsdk.Resource {
 		Read:   resourceSpringCloudConfigurationServiceRead,
 		Update: resourceSpringCloudConfigurationServiceCreateUpdate,
 		Delete: resourceSpringCloudConfigurationServiceDelete,
+
+		SchemaVersion: 1,
+		StateUpgraders: pluginsdk.StateUpgrades(map[int]pluginsdk.StateUpgrade{
+			0: migration.SpringCloudConfigurationServiceV0ToV1{},
+		}),
 
 		Timeouts: &pluginsdk.ResourceTimeout{
 			Create: pluginsdk.DefaultTimeout(30 * time.Minute),
@@ -50,6 +59,15 @@ func resourceSpringCloudConfigurationService() *pluginsdk.Resource {
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validate.SpringCloudServiceID,
+			},
+
+			"generation": {
+				Type:     pluginsdk.TypeString,
+				Optional: true,
+				ValidateFunc: validation.StringInSlice([]string{
+					string(appplatform.ConfigurationServiceGenerationGen1),
+					string(appplatform.ConfigurationServiceGenerationGen2),
+				}, false),
 			},
 
 			"repository": {
@@ -84,6 +102,12 @@ func resourceSpringCloudConfigurationService() *pluginsdk.Resource {
 							ValidateFunc: validation.StringIsNotEmpty,
 						},
 
+						"ca_certificate_id": {
+							Type:         pluginsdk.TypeString,
+							Optional:     true,
+							ValidateFunc: validate.SpringCloudCertificateID,
+						},
+
 						"host_key": {
 							Type:         pluginsdk.TypeString,
 							Optional:     true,
@@ -99,12 +123,14 @@ func resourceSpringCloudConfigurationService() *pluginsdk.Resource {
 						"password": {
 							Type:         pluginsdk.TypeString,
 							Optional:     true,
+							Sensitive:    true,
 							ValidateFunc: validation.StringIsNotEmpty,
 						},
 
 						"private_key": {
 							Type:         pluginsdk.TypeString,
 							Optional:     true,
+							Sensitive:    true,
 							ValidateFunc: validation.StringIsNotEmpty,
 						},
 
@@ -159,6 +185,7 @@ func resourceSpringCloudConfigurationServiceCreateUpdate(d *pluginsdk.ResourceDa
 
 	configurationServiceResource := appplatform.ConfigurationServiceResource{
 		Properties: &appplatform.ConfigurationServiceProperties{
+			Generation: appplatform.ConfigurationServiceGeneration(d.Get("generation").(string)),
 			Settings: &appplatform.ConfigurationServiceSettings{
 				GitProperty: &appplatform.ConfigurationServiceGitProperty{
 					Repositories: expandConfigurationServiceConfigurationServiceGitRepositoryArray(d.Get("repository").([]interface{})),
@@ -201,6 +228,7 @@ func resourceSpringCloudConfigurationServiceRead(d *pluginsdk.ResourceData, meta
 	d.Set("name", id.ConfigurationServiceName)
 	d.Set("spring_cloud_service_id", parse.NewSpringCloudServiceID(id.SubscriptionId, id.ResourceGroup, id.SpringName).ID())
 	if props := resp.Properties; props != nil {
+		d.Set("generation", props.Generation)
 		if props.Settings != nil && props.Settings.GitProperty != nil {
 			d.Set("repository", flattenConfigurationServiceConfigurationServiceGitRepositoryArray(props.Settings.GitProperty.Repositories, d.Get("repository").([]interface{})))
 		}
@@ -236,7 +264,7 @@ func expandConfigurationServiceConfigurationServiceGitRepositoryArray(input []in
 	results := make([]appplatform.ConfigurationServiceGitRepository, 0)
 	for _, item := range input {
 		v := item.(map[string]interface{})
-		results = append(results, appplatform.ConfigurationServiceGitRepository{
+		repo := appplatform.ConfigurationServiceGitRepository{
 			Name:                  utils.String(v["name"].(string)),
 			Patterns:              utils.ExpandStringSlice(v["patterns"].(*pluginsdk.Set).List()),
 			URI:                   utils.String(v["uri"].(string)),
@@ -248,7 +276,11 @@ func expandConfigurationServiceConfigurationServiceGitRepositoryArray(input []in
 			HostKeyAlgorithm:      utils.String(v["host_key_algorithm"].(string)),
 			PrivateKey:            utils.String(v["private_key"].(string)),
 			StrictHostKeyChecking: utils.Bool(v["strict_host_key_checking"].(bool)),
-		})
+		}
+		if caCertificatedId := v["ca_certificate_id"].(string); caCertificatedId != "" {
+			repo.CaCertResourceID = utils.String(caCertificatedId)
+		}
+		results = append(results, repo)
 	}
 	return &results
 }
@@ -308,7 +340,16 @@ func flattenConfigurationServiceConfigurationServiceGitRepositoryArray(input *[]
 				username = value.(string)
 			}
 		}
+
+		var caCertificateId string
+		if item.CaCertResourceID != nil {
+			certificatedId, err := parse.SpringCloudCertificateIDInsensitively(*item.CaCertResourceID)
+			if err == nil {
+				caCertificateId = certificatedId.ID()
+			}
+		}
 		results = append(results, map[string]interface{}{
+			"ca_certificate_id":        caCertificateId,
 			"name":                     name,
 			"label":                    label,
 			"patterns":                 utils.FlattenStringSlice(item.Patterns),

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package powerbi
 
 import (
@@ -9,10 +12,10 @@ import (
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonschema"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/tags"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/powerbidedicated/2021-01-01/capacities"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/powerbi/sdk/2021-01-01/capacities"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/powerbi/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
@@ -35,7 +38,7 @@ func resourcePowerBIEmbedded() *pluginsdk.Resource {
 		},
 
 		Importer: pluginsdk.ImporterValidatingResourceId(func(id string) error {
-			_, err := capacities.ParseCapacitiesID(id)
+			_, err := capacities.ParseCapacityID(id)
 			return err
 		}),
 
@@ -95,7 +98,7 @@ func resourcePowerBIEmbeddedCreate(d *pluginsdk.ResourceData, meta interface{}) 
 	ctx, cancel := timeouts.ForCreate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id := capacities.NewCapacitiesID(subscriptionId, d.Get("resource_group_name").(string), d.Get("name").(string))
+	id := capacities.NewCapacityID(subscriptionId, d.Get("resource_group_name").(string), d.Get("name").(string))
 	existing, err := client.GetDetails(ctx, id)
 	if err != nil {
 		if !response.WasNotFound(existing.HttpResponse) {
@@ -136,7 +139,7 @@ func resourcePowerBIEmbeddedRead(d *pluginsdk.ResourceData, meta interface{}) er
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id, err := capacities.ParseCapacitiesID(d.Id())
+	id, err := capacities.ParseCapacityID(d.Id())
 	if err != nil {
 		return err
 	}
@@ -151,7 +154,7 @@ func resourcePowerBIEmbeddedRead(d *pluginsdk.ResourceData, meta interface{}) er
 		return fmt.Errorf("retrieving %s: %+v", *id, err)
 	}
 
-	d.Set("name", id.DedicatedCapacityName)
+	d.Set("name", id.CapacityName)
 	d.Set("resource_group_name", id.ResourceGroupName)
 
 	if model := resp.Model; model != nil {
@@ -188,7 +191,7 @@ func resourcePowerBIEmbeddedUpdate(d *pluginsdk.ResourceData, meta interface{}) 
 	ctx, cancel := timeouts.ForUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id, err := capacities.ParseCapacitiesID(d.Id())
+	id, err := capacities.ParseCapacityID(d.Id())
 	if err != nil {
 		return err
 	}
@@ -229,7 +232,7 @@ func resourcePowerBIEmbeddedDelete(d *pluginsdk.ResourceData, meta interface{}) 
 	ctx, cancel := timeouts.ForDelete(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	id, err := capacities.ParseCapacitiesID(d.Id())
+	id, err := capacities.ParseCapacityID(d.Id())
 	if err != nil {
 		return err
 	}

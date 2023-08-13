@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package datafactory_test
 
 import (
@@ -22,6 +25,21 @@ func TestAccDataFactoryTriggerSchedule_basic(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.basic(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccDataFactoryTriggerSchedule_pipeline(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_data_factory_trigger_schedule", "test")
+	r := TriggerScheduleResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.pipeline(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -103,18 +121,18 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "test" {
-  name     = "acctestRG-df-%d"
-  location = "%s"
+  name     = "acctestRG-df-%[1]d"
+  location = "%[2]s"
 }
 
 resource "azurerm_data_factory" "test" {
-  name                = "acctestdf%d"
+  name                = "acctestdf%[1]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
 }
 
 resource "azurerm_data_factory_pipeline" "test" {
-  name            = "acctest%d"
+  name            = "acctest%[1]d"
   data_factory_id = azurerm_data_factory.test.id
 
   parameters = {
@@ -123,13 +141,67 @@ resource "azurerm_data_factory_pipeline" "test" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "test" {
-  name            = "acctestdf%d"
+  name            = "acctestdf%[1]d"
   data_factory_id = azurerm_data_factory.test.id
   pipeline_name   = azurerm_data_factory_pipeline.test.name
 
   annotations = ["test1", "test2", "test3"]
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+`, data.RandomInteger, data.Locations.Primary)
+}
+
+func (TriggerScheduleResource) pipeline(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-df-%[1]d"
+  location = "%s"
+}
+
+resource "azurerm_data_factory" "test" {
+  name                = "acctestdf%[1]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+}
+
+resource "azurerm_data_factory_pipeline" "test1" {
+  name            = "acctest%[1]d"
+  data_factory_id = azurerm_data_factory.test.id
+
+  parameters = {
+    test = "testparameter1"
+  }
+}
+
+resource "azurerm_data_factory_pipeline" "test2" {
+  name            = "acctests%[1]d"
+  data_factory_id = azurerm_data_factory.test.id
+
+  parameters = {
+    test = "testparameter2"
+  }
+}
+
+resource "azurerm_data_factory_trigger_schedule" "test" {
+  name            = "acctestdf%[1]d"
+  data_factory_id = azurerm_data_factory.test.id
+
+  pipeline {
+    name       = azurerm_data_factory_pipeline.test1.name
+    parameters = azurerm_data_factory_pipeline.test1.parameters
+  }
+
+  pipeline {
+    name       = azurerm_data_factory_pipeline.test2.name
+    parameters = azurerm_data_factory_pipeline.test2.parameters
+  }
+
+  annotations = ["test1", "test2", "test3"]
+}
+`, data.RandomInteger, data.Locations.Primary)
 }
 
 func (TriggerScheduleResource) update(data acceptance.TestData) string {
@@ -139,18 +211,18 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "test" {
-  name     = "acctestRG-df-%d"
-  location = "%s"
+  name     = "acctestRG-df-%[1]d"
+  location = "%[2]s"
 }
 
 resource "azurerm_data_factory" "test" {
-  name                = "acctestdf%d"
+  name                = "acctestdf%[1]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
 }
 
 resource "azurerm_data_factory_pipeline" "test" {
-  name            = "acctest%d"
+  name            = "acctest%[1]d"
   data_factory_id = azurerm_data_factory.test.id
 
   parameters = {
@@ -159,7 +231,7 @@ resource "azurerm_data_factory_pipeline" "test" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "test" {
-  name                = "acctestdf%d"
+  name                = "acctestdf%[1]d"
   data_factory_id     = azurerm_data_factory.test.id
   pipeline_name       = azurerm_data_factory_pipeline.test.name
   description         = "test"
@@ -170,8 +242,9 @@ resource "azurerm_data_factory_trigger_schedule" "test" {
   activated           = true
   end_time            = "2022-09-22T00:00:00Z"
   start_time          = "2022-09-21T00:00:00Z"
+  time_zone           = "GMT Standard Time"
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+`, data.RandomInteger, data.Locations.Primary)
 }
 
 func (TriggerScheduleResource) scheduleWeekly(data acceptance.TestData) string {
@@ -181,18 +254,18 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "test" {
-  name     = "acctestRG-df-%d"
-  location = "%s"
+  name     = "acctestRG-df-%[1]d"
+  location = "%[2]s"
 }
 
 resource "azurerm_data_factory" "test" {
-  name                = "acctestdf%d"
+  name                = "acctestdf%[1]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
 }
 
 resource "azurerm_data_factory_pipeline" "test" {
-  name            = "acctest%d"
+  name            = "acctest%[1]d"
   data_factory_id = azurerm_data_factory.test.id
 
   parameters = {
@@ -201,7 +274,7 @@ resource "azurerm_data_factory_pipeline" "test" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "test" {
-  name            = "acctestdf%d"
+  name            = "acctestdf%[1]d"
   data_factory_id = azurerm_data_factory.test.id
   pipeline_name   = azurerm_data_factory_pipeline.test.name
 
@@ -215,7 +288,7 @@ resource "azurerm_data_factory_trigger_schedule" "test" {
     days_of_week = ["Monday", "Tuesday"]
   }
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+`, data.RandomInteger, data.Locations.Primary)
 }
 
 func (TriggerScheduleResource) scheduleMonthly(data acceptance.TestData) string {
@@ -225,18 +298,18 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "test" {
-  name     = "acctestRG-df-%d"
-  location = "%s"
+  name     = "acctestRG-df-%[1]d"
+  location = "%[2]s"
 }
 
 resource "azurerm_data_factory" "test" {
-  name                = "acctestdf%d"
+  name                = "acctestdf%[1]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
 }
 
 resource "azurerm_data_factory_pipeline" "test" {
-  name            = "acctest%d"
+  name            = "acctest%[1]d"
   data_factory_id = azurerm_data_factory.test.id
 
   parameters = {
@@ -245,7 +318,7 @@ resource "azurerm_data_factory_pipeline" "test" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "test" {
-  name            = "acctestdf%d"
+  name            = "acctestdf%[1]d"
   data_factory_id = azurerm_data_factory.test.id
   pipeline_name   = azurerm_data_factory_pipeline.test.name
 
@@ -264,5 +337,5 @@ resource "azurerm_data_factory_trigger_schedule" "test" {
     }
   }
 }
-`, data.RandomInteger, data.Locations.Primary, data.RandomInteger, data.RandomInteger, data.RandomInteger)
+`, data.RandomInteger, data.Locations.Primary)
 }

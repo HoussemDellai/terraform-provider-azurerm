@@ -1,6 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package authorization
 
 import (
+	"encoding/base64"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
@@ -45,7 +50,8 @@ func dataSourceArmClientConfigRead(d *pluginsdk.ResourceData, meta interface{}) 
 	_, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	d.SetId(time.Now().UTC().String())
+	id := fmt.Sprintf("clientConfigs/clientId=%s;objectId=%s;subscriptionId=%s;tenantId=%s", client.Account.ClientId, client.Account.ObjectId, client.Account.SubscriptionId, client.Account.TenantId)
+	d.SetId(base64.StdEncoding.EncodeToString([]byte(id)))
 	d.Set("client_id", client.Account.ClientId)
 	d.Set("object_id", client.Account.ObjectId)
 	d.Set("subscription_id", client.Account.SubscriptionId)

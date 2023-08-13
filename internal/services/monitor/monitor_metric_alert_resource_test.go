@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package monitor_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/insights/2018-03-01/metricalerts"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/monitor/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -48,6 +51,21 @@ func TestAccMonitorMetricAlert_requiresImport(t *testing.T) {
 	})
 }
 
+func TestAccMonitorMetricAlert_multiCriteria(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_monitor_metric_alert", "test")
+	r := MonitorMetricAlertResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.multiCriteria(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func TestAccMonitorMetricAlert_complete(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_monitor_metric_alert", "test")
 	r := MonitorMetricAlertResource{}
@@ -55,6 +73,21 @@ func TestAccMonitorMetricAlert_complete(t *testing.T) {
 	data.ResourceTest(t, r, []acceptance.TestStep{
 		{
 			Config: r.complete(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
+func TestAccMonitorMetricAlert_dynamicCriteria(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_monitor_metric_alert", "test")
+	r := MonitorMetricAlertResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.dynamicCriteria(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
 			),
@@ -134,17 +167,17 @@ func TestAccMonitorMetricAlert_applicationInsightsWebTest(t *testing.T) {
 }
 
 func (t MonitorMetricAlertResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.MetricAlertID(state.ID)
+	id, err := metricalerts.ParseMetricAlertID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.Monitor.MetricAlertsClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.Monitor.MetricAlertsClient.Get(ctx, *id)
 	if err != nil {
 		return nil, fmt.Errorf("reading (%s): %+v", *id, err)
 	}
 
-	return utils.Bool(resp.ID != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (MonitorMetricAlertResource) basic(data acceptance.TestData) string {
@@ -210,6 +243,107 @@ resource "azurerm_monitor_metric_alert" "import" {
   window_size = "PT1H"
 }
 `, r.basic(data))
+}
+
+func (MonitorMetricAlertResource) dynamicCriteria(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%[1]d"
+  location = "%[2]s"
+}
+
+resource "azurerm_storage_account" "test" {
+  name                     = "acctestsa1%[3]s"
+  resource_group_name      = azurerm_resource_group.test.name
+  location                 = azurerm_resource_group.test.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_monitor_metric_alert" "test" {
+  name                = "acctestMetricAlert-%[1]d"
+  resource_group_name = azurerm_resource_group.test.name
+  scopes              = [azurerm_storage_account.test.id]
+
+  dynamic_criteria {
+    metric_namespace  = "Microsoft.Storage/storageAccounts"
+    metric_name       = "Availability"
+    aggregation       = "Minimum"
+    operator          = "GreaterThan"
+    alert_sensitivity = "High"
+
+    dimension {
+      name     = "ApiName"
+      operator = "Include"
+      values   = ["*"]
+    }
+
+    evaluation_total_count   = 4
+    evaluation_failure_count = 1
+  }
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString)
+}
+
+func (MonitorMetricAlertResource) multiCriteria(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "test" {
+  name     = "acctestRG-%[1]d"
+  location = "%[2]s"
+}
+
+resource "azurerm_storage_account" "test" {
+  name                     = "acctestsa1%[3]s"
+  resource_group_name      = azurerm_resource_group.test.name
+  location                 = azurerm_resource_group.test.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_monitor_metric_alert" "test" {
+  name                = "acctestMetricAlert-%[1]d"
+  resource_group_name = azurerm_resource_group.test.name
+  scopes              = [azurerm_storage_account.test.id]
+  enabled             = true
+  auto_mitigate       = false
+  severity            = 4
+  description         = "This is a complete metric alert acceptance."
+  frequency           = "PT30M"
+  window_size         = "PT12H"
+
+  criteria {
+    metric_namespace       = "Microsoft.Storage/storageAccounts"
+    metric_name            = "Transactions"
+    aggregation            = "Total"
+    operator               = "GreaterThan"
+    threshold              = 99
+    skip_metric_validation = true
+
+    dimension {
+      name     = "GeoType"
+      operator = "Include"
+      values   = ["Primary"]
+    }
+  }
+
+  criteria {
+    metric_namespace = "Microsoft.Storage/storageAccounts"
+    metric_name      = "UsedCapacity"
+    aggregation      = "Average"
+    operator         = "GreaterThan"
+    threshold        = 55.5
+  }
+
+}
+`, data.RandomInteger, data.Locations.Primary, data.RandomString)
 }
 
 func (MonitorMetricAlertResource) complete(data acceptance.TestData) string {

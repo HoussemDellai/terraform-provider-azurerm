@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package datafactory
 
 import (
@@ -5,8 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/datafactory/mgmt/2018-06-01/datafactory"
+	"github.com/Azure/azure-sdk-for-go/services/datafactory/mgmt/2018-06-01/datafactory" // nolint: staticcheck
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/datafactory/2018-06-01/factories"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/datafactory/parse"
@@ -49,7 +53,7 @@ func resourceDataFactoryTriggerSchedule() *pluginsdk.Resource {
 				Type:         pluginsdk.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: validate.DataFactoryID,
+				ValidateFunc: factories.ValidateFactoryID,
 			},
 
 			"description": {
@@ -153,6 +157,12 @@ func resourceDataFactoryTriggerSchedule() *pluginsdk.Resource {
 				ValidateFunc:     validation.IsRFC3339Time, // times in the past just start immediately
 			},
 
+			"time_zone": {
+				Type:         pluginsdk.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.StringIsNotEmpty,
+			},
+
 			"frequency": {
 				Type:     pluginsdk.TypeString,
 				Optional: true,
@@ -179,15 +189,44 @@ func resourceDataFactoryTriggerSchedule() *pluginsdk.Resource {
 				Default:  true,
 			},
 
+			"pipeline": {
+				Type:          pluginsdk.TypeList,
+				Optional:      true,
+				Computed:      true,
+				ConflictsWith: []string{"pipeline_parameters"},
+				ExactlyOneOf:  []string{"pipeline", "pipeline_name"},
+				Elem: &pluginsdk.Resource{
+					Schema: map[string]*pluginsdk.Schema{
+						"name": {
+							Type:         pluginsdk.TypeString,
+							Required:     true,
+							ValidateFunc: validate.DataFactoryPipelineAndTriggerName(),
+						},
+
+						"parameters": {
+							Type:     pluginsdk.TypeMap,
+							Optional: true,
+							Elem: &pluginsdk.Schema{
+								Type: pluginsdk.TypeString,
+							},
+						},
+					},
+				},
+			},
+
 			"pipeline_name": {
 				Type:         pluginsdk.TypeString,
-				Required:     true,
+				Optional:     true,
+				Computed:     true,
+				ExactlyOneOf: []string{"pipeline", "pipeline_name"},
 				ValidateFunc: validate.DataFactoryPipelineAndTriggerName(),
 			},
 
 			"pipeline_parameters": {
-				Type:     pluginsdk.TypeMap,
-				Optional: true,
+				Type:          pluginsdk.TypeMap,
+				Optional:      true,
+				Computed:      true,
+				ConflictsWith: []string{"pipeline"},
 				Elem: &pluginsdk.Schema{
 					Type: pluginsdk.TypeString,
 				},
@@ -211,12 +250,12 @@ func resourceDataFactoryTriggerScheduleCreate(d *pluginsdk.ResourceData, meta in
 	ctx, cancel := timeouts.ForCreateUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	dataFactoryId, err := parse.DataFactoryID(d.Get("data_factory_id").(string))
+	dataFactoryId, err := factories.ParseFactoryID(d.Get("data_factory_id").(string))
 	if err != nil {
 		return err
 	}
 
-	id := parse.NewTriggerID(subscriptionId, dataFactoryId.ResourceGroup, dataFactoryId.FactoryName, d.Get("name").(string))
+	id := parse.NewTriggerID(subscriptionId, dataFactoryId.ResourceGroupName, dataFactoryId.FactoryName, d.Get("name").(string))
 
 	existing, err := client.Get(ctx, id.ResourceGroup, id.FactoryName, id.Name, "")
 	if err != nil {
@@ -234,6 +273,7 @@ func resourceDataFactoryTriggerScheduleCreate(d *pluginsdk.ResourceData, meta in
 			Frequency: datafactory.RecurrenceFrequency(d.Get("frequency").(string)),
 			Interval:  utils.Int32(int32(d.Get("interval").(int))),
 			Schedule:  expandDataFactorySchedule(d.Get("schedule").([]interface{})),
+			TimeZone:  utils.String(d.Get("time_zone").(string)),
 		},
 	}
 
@@ -250,20 +290,23 @@ func resourceDataFactoryTriggerScheduleCreate(d *pluginsdk.ResourceData, meta in
 		props.Recurrence.EndTime = &date.Time{Time: t}
 	}
 
-	reference := &datafactory.PipelineReference{
-		ReferenceName: utils.String(d.Get("pipeline_name").(string)),
-		Type:          utils.String("PipelineReference"),
-	}
-
 	scheduleProps := &datafactory.ScheduleTrigger{
 		ScheduleTriggerTypeProperties: props,
-		Pipelines: &[]datafactory.TriggerPipelineReference{
+		Description:                   utils.String(d.Get("description").(string)),
+	}
+
+	if pipelineName := d.Get("pipeline_name").(string); len(pipelineName) != 0 {
+		scheduleProps.Pipelines = &[]datafactory.TriggerPipelineReference{
 			{
-				PipelineReference: reference,
-				Parameters:        d.Get("pipeline_parameters").(map[string]interface{}),
+				PipelineReference: &datafactory.PipelineReference{
+					ReferenceName: utils.String(pipelineName),
+					Type:          utils.String("PipelineReference"),
+				},
+				Parameters: d.Get("pipeline_parameters").(map[string]interface{}),
 			},
-		},
-		Description: utils.String(d.Get("description").(string)),
+		}
+	} else {
+		scheduleProps.Pipelines = expandDataFactoryPipelines(d.Get("pipeline").([]interface{}))
 	}
 
 	if v, ok := d.GetOk("annotations"); ok {
@@ -323,6 +366,7 @@ func resourceDataFactoryTriggerScheduleUpdate(d *pluginsdk.ResourceData, meta in
 			Frequency: datafactory.RecurrenceFrequency(d.Get("frequency").(string)),
 			Interval:  utils.Int32(int32(d.Get("interval").(int))),
 			Schedule:  expandDataFactorySchedule(d.Get("schedule").([]interface{})),
+			TimeZone:  utils.String(d.Get("time_zone").(string)),
 		},
 	}
 
@@ -339,20 +383,25 @@ func resourceDataFactoryTriggerScheduleUpdate(d *pluginsdk.ResourceData, meta in
 		props.Recurrence.EndTime = &date.Time{Time: t}
 	}
 
-	reference := &datafactory.PipelineReference{
-		ReferenceName: utils.String(d.Get("pipeline_name").(string)),
-		Type:          utils.String("PipelineReference"),
-	}
-
 	scheduleProps := &datafactory.ScheduleTrigger{
 		ScheduleTriggerTypeProperties: props,
-		Pipelines: &[]datafactory.TriggerPipelineReference{
+		Description:                   utils.String(d.Get("description").(string)),
+	}
+
+	pipelineName := d.Get("pipeline_name").(string)
+	pipeline := d.Get("pipeline").([]interface{})
+	if (d.HasChange("pipeline_name") && len(pipelineName) == 0) || (d.HasChange("pipeline") && len(pipeline) != 0) {
+		scheduleProps.Pipelines = expandDataFactoryPipelines(pipeline)
+	} else {
+		scheduleProps.Pipelines = &[]datafactory.TriggerPipelineReference{
 			{
-				PipelineReference: reference,
-				Parameters:        d.Get("pipeline_parameters").(map[string]interface{}),
+				PipelineReference: &datafactory.PipelineReference{
+					ReferenceName: utils.String(pipelineName),
+					Type:          utils.String("PipelineReference"),
+				},
+				Parameters: d.Get("pipeline_parameters").(map[string]interface{}),
 			},
-		},
-		Description: utils.String(d.Get("description").(string)),
+		}
 	}
 
 	if v, ok := d.GetOk("annotations"); ok {
@@ -391,7 +440,7 @@ func resourceDataFactoryTriggerScheduleRead(d *pluginsdk.ResourceData, meta inte
 		return err
 	}
 
-	dataFactoryId := parse.NewDataFactoryID(id.SubscriptionId, id.ResourceGroup, id.FactoryName)
+	dataFactoryId := factories.NewFactoryID(id.SubscriptionId, id.ResourceGroup, id.FactoryName)
 
 	resp, err := client.Get(ctx, id.ResourceGroup, id.FactoryName, id.Name, "")
 	if err != nil {
@@ -423,6 +472,7 @@ func resourceDataFactoryTriggerScheduleRead(d *pluginsdk.ResourceData, meta inte
 			}
 			d.Set("frequency", recurrence.Frequency)
 			d.Set("interval", recurrence.Interval)
+			d.Set("time_zone", recurrence.TimeZone)
 
 			if schedule := recurrence.Schedule; schedule != nil {
 				d.Set("schedule", flattenDataFactorySchedule(schedule))
@@ -436,6 +486,7 @@ func resourceDataFactoryTriggerScheduleRead(d *pluginsdk.ResourceData, meta inte
 					d.Set("pipeline_name", reference.ReferenceName)
 				}
 				d.Set("pipeline_parameters", pipeline[0].Parameters)
+				d.Set("pipeline", flattenDataFactoryPipelines(pipelines))
 			}
 		}
 
@@ -550,4 +601,43 @@ func flattenDataFactorySchedule(schedule *datafactory.RecurrenceSchedule) []inte
 		value["monthly"] = monthlyOccurrences
 	}
 	return []interface{}{value}
+}
+
+func expandDataFactoryPipelines(input []interface{}) *[]datafactory.TriggerPipelineReference {
+	if len(input) == 0 {
+		return nil
+	}
+
+	pipes := make([]datafactory.TriggerPipelineReference, 0)
+
+	for _, item := range input {
+		config := item.(map[string]interface{})
+		v := datafactory.TriggerPipelineReference{
+			PipelineReference: &datafactory.PipelineReference{
+				ReferenceName: utils.String(config["name"].(string)),
+				Type:          utils.String("PipelineReference"),
+			},
+			Parameters: config["parameters"].(map[string]interface{}),
+		}
+		pipes = append(pipes, v)
+	}
+
+	return &pipes
+}
+
+func flattenDataFactoryPipelines(pipelines *[]datafactory.TriggerPipelineReference) interface{} {
+	if pipelines == nil {
+		return []interface{}{}
+	}
+
+	res := make([]interface{}, 0)
+
+	for _, item := range *pipelines {
+		v := make(map[string]interface{})
+		v["name"] = utils.String(*item.PipelineReference.ReferenceName)
+		v["parameters"] = item.Parameters
+		res = append(res, v)
+	}
+
+	return &res
 }

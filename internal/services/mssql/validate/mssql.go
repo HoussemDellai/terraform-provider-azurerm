@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import (
@@ -47,6 +50,19 @@ func ValidateMsSqlElasticPoolName(i interface{}, k string) (_ []string, errors [
 func ValidateMsSqlJobAgentName(i interface{}, k string) (_ []string, errors []error) {
 	if m, regexErrs := validate.RegExHelper(i, k, `^[^?<>*%&:\/?]{0,127}[^?<>*%&:\/?. ]$`); !m {
 		return nil, append(regexErrs, fmt.Errorf("%q must not contain any of ?<>*%%&:\\/?, must not end with a space or a period and can't have more than 128 characters", k))
+	}
+
+	return nil, nil
+}
+
+// ValidateMsSqlDNSAliasName
+// Server DNS Alias name cannot be empty or null. It can only be made
+//
+//	up of lowercase letters 'a'-'z', the numbers 0-9 and the hyphen. The hyphen
+//	may not lead or trail in the name.
+func ValidateMsSqlDNSAliasName(i interface{}, k string) ([]string, []error) {
+	if m, regexErrs := validate.RegExHelper(i, k, `^[0-9a-z][-0-9a-z]{0,127}[0-9a-z]$`); !m {
+		return nil, append(regexErrs, fmt.Errorf("`%q` Server DNS Alias name cannot be empty or null. It can only be made up of lowercase letters 'a'-'z', the numbers 0-9 and the hyphen. The hyphen may not lead or trail in the name.", k))
 	}
 
 	return nil, nil

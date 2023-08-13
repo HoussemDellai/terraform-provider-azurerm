@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package desktopvirtualization_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/desktopvirtualization/2022-02-10-preview/workspace"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/desktopvirtualization/parse"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -93,17 +96,17 @@ func TestAccAzureRMDesktopVirtualizationWorkspace_requiresImport(t *testing.T) {
 }
 
 func (t AzureRMDesktopVirtualizationWorkspaceResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
-	id, err := parse.WorkspaceID(state.ID)
+	id, err := workspace.ParseWorkspaceID(state.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := clients.DesktopVirtualization.WorkspacesClient.Get(ctx, id.ResourceGroup, id.Name)
+	resp, err := clients.DesktopVirtualization.WorkspacesClient.Get(ctx, *id)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving Virtual Desktop Workspace %q (Resource Group: %q): %v", id.Name, id.ResourceGroup, err)
+		return nil, fmt.Errorf("retrieving %s: %+v", *id, err)
 	}
 
-	return utils.Bool(resp.WorkspaceProperties != nil), nil
+	return utils.Bool(resp.Model != nil), nil
 }
 
 func (AzureRMDesktopVirtualizationWorkspaceResource) basic(data acceptance.TestData) string {
@@ -137,11 +140,12 @@ resource "azurerm_resource_group" "test" {
 }
 
 resource "azurerm_virtual_desktop_workspace" "test" {
-  name                = "acctestWS%d"
-  location            = azurerm_resource_group.test.location
-  resource_group_name = azurerm_resource_group.test.name
-  friendly_name       = "Acceptance Test!"
-  description         = "Acceptance Test by creating acctws%d"
+  name                          = "acctestWS%d"
+  location                      = azurerm_resource_group.test.location
+  resource_group_name           = azurerm_resource_group.test.name
+  friendly_name                 = "Acceptance Test!"
+  description                   = "Acceptance Test by creating acctws%d"
+  public_network_access_enabled = false
 }
 `, data.RandomInteger, data.Locations.Secondary, data.RandomIntOfLength(8), data.RandomInteger)
 }

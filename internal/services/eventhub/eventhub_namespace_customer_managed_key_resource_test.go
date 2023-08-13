@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package eventhub_test
 
 import (
@@ -5,10 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-azure-sdk/resource-manager/eventhub/2022-01-01-preview/namespaces"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/eventhub/sdk/2021-01-01-preview/namespaces"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -168,8 +171,9 @@ resource "azurerm_key_vault_key" "test2" {
 }
 
 resource "azurerm_eventhub_namespace_customer_managed_key" "test" {
-  eventhub_namespace_id = azurerm_eventhub_namespace.test.id
-  key_vault_key_ids     = [azurerm_key_vault_key.test.id, azurerm_key_vault_key.test2.id]
+  eventhub_namespace_id             = azurerm_eventhub_namespace.test.id
+  key_vault_key_ids                 = [azurerm_key_vault_key.test.id, azurerm_key_vault_key.test2.id]
+  infrastructure_encryption_enabled = true
 }
 `, r.template(data), data.RandomString)
 }
@@ -225,7 +229,7 @@ resource "azurerm_key_vault_access_policy" "test" {
   tenant_id    = azurerm_eventhub_namespace.test.identity.0.tenant_id
   object_id    = azurerm_eventhub_namespace.test.identity.0.principal_id
 
-  key_permissions = ["Get", "UnwrapKey", "WrapKey"]
+  key_permissions = ["Get", "UnwrapKey", "WrapKey", "GetRotationPolicy"]
 }
 
 resource "azurerm_key_vault_access_policy" "test2" {
@@ -240,6 +244,7 @@ resource "azurerm_key_vault_access_policy" "test2" {
     "List",
     "Purge",
     "Recover",
+    "GetRotationPolicy"
   ]
 }
 

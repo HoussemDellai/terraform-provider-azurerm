@@ -7,9 +7,11 @@ description: |-
 
 ---
 
-# azurerm_packet_capture
+# azurerm_network_packet_capture
 
 Configures Network Packet Capturing against a Virtual Machine using a Network Watcher.
+
+!> **NOTE:** The `azurerm_network_packet_capture` resource is deprecated and will be removed in favour of `azurerm_virtual_machine_packet_capture` and `azurerm_virtual_machine_scale_set_packet_capture` in version 4.0 of the AzureRM Provider.
 
 ## Example Usage
 
@@ -60,8 +62,8 @@ resource "azurerm_virtual_machine" "example" {
 
   storage_image_reference {
     publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "16.04-LTS"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts"
     version   = "latest"
   }
 
@@ -85,9 +87,7 @@ resource "azurerm_virtual_machine" "example" {
 
 resource "azurerm_virtual_machine_extension" "example" {
   name                       = "network-watcher"
-  location                   = azurerm_resource_group.example.location
-  resource_group_name        = azurerm_resource_group.example.name
-  virtual_machine_name       = azurerm_virtual_machine.example.name
+  virtual_machine_id         = azurerm_virtual_machine.example.id
   publisher                  = "Microsoft.Azure.NetworkWatcher"
   type                       = "NetworkWatcherAgentLinux"
   type_handler_version       = "1.4"
@@ -152,6 +152,8 @@ A `storage_location` block contains:
 
 ~> **NOTE:** At least one of `file_path` or `storage_account_id` must be specified.
 
+---
+
 A `filter` block contains:
 
 * `local_ip_address` - (Optional) The local IP Address to be filtered on. Notation: "127.0.0.1" for single address entry. "127.0.0.1-127.0.0.255" for range. "127.0.0.1;127.0.0.5" for multiple entries. Multiple ranges not currently supported. Mixing ranges with multiple entries not currently supported. Changing this forces a new resource to be created.
@@ -166,7 +168,7 @@ A `filter` block contains:
 
 ## Attributes Reference
 
-The following attributes are exported:
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The Packet Capture ID.
 
@@ -180,7 +182,7 @@ A `storage_location` block contains:
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Packet Capture.
 * `update` - (Defaults to 30 minutes) Used when updating the Packet Capture.

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package connections_test
 
 import (
@@ -6,13 +9,12 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-azure-helpers/lang/response"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/services/connections/sdk/2016-06-01/connections"
-	"github.com/hashicorp/terraform-provider-azurerm/utils"
-
+	"github.com/hashicorp/go-azure-sdk/resource-manager/web/2016-06-01/connections"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/acceptance/check"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
+	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
 
 type ApiConnectionTestResource struct {

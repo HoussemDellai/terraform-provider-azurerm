@@ -11,7 +11,7 @@ description: |-
 The Azure Provider can be used to configure infrastructure in [Microsoft Azure](https://azure.microsoft.com/en-us/) using the Azure Resource Manager API's. Documentation regarding the [Data Sources](/docs/configuration/data-sources.html) and [Resources](/docs/configuration/resources.html) supported by the Azure Provider can be found in the navigation to the left.
 
 To learn the basics of Terraform using this provider, follow the
-hands-on [get started tutorials](https://learn.hashicorp.com/tutorials/terraform/infrastructure-as-code?in=terraform/azure-get-started) on HashiCorp's Learn platform.
+hands-on [get started tutorials](https://learn.hashicorp.com/tutorials/terraform/infrastructure-as-code?in=terraform/azure-get-started).
 
 Interested in the provider's latest features, or want to make sure you're up to date? Check out the [changelog](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/CHANGELOG.md) for version information and release notes.
 
@@ -23,10 +23,13 @@ Terraform supports a number of different methods for authenticating to Azure:
 * [Authenticating to Azure using Managed Service Identity](guides/managed_service_identity.html)
 * [Authenticating to Azure using a Service Principal and a Client Certificate](guides/service_principal_client_certificate.html)
 * [Authenticating to Azure using a Service Principal and a Client Secret](guides/service_principal_client_secret.html)
+* [Authenticating to Azure using OpenID Connect](guides/service_principal_oidc.html)
 
 ---
 
 We recommend using either a Service Principal or Managed Service Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.
+
+->**Note:** The User, Service Principal or Managed Identity running Terraform should have permissions to register [Azure Resource Providers](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types). If the principal running Terraform has insufficient permissions to register Resource Providers then we recommend setting the property [skip_provider_registration](#skip_provider_registration) in the provider block to prevent auto-registration.
 
 ## Example Usage
 
@@ -44,6 +47,7 @@ terraform {
 
 # Configure the Microsoft Azure Provider
 provider "azurerm" {
+  skip_provider_registration = true # This is only required when the User, Service Principal, or Identity running Terraform lacks the permissions to register Azure Resource Providers.
   features {}
 }
 
@@ -62,7 +66,7 @@ resource "azurerm_virtual_network" "example" {
 }
 ```
 
-## Features and Bug Requests
+## Bugs and Feature Requests
 
 The Azure provider's bugs and feature requests can be found in the [GitHub repo issues](https://github.com/hashicorp/terraform-provider-azurerm/issues).
 Please avoid "me too" or "+1" comments. Instead, use a thumbs up [reaction](https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/)
@@ -101,17 +105,21 @@ The following arguments are supported:
 
 * `client_id` - (Optional) The Client ID which should be used. This can also be sourced from the `ARM_CLIENT_ID` Environment Variable.
 
+* `client_id_file_path` (Optional) The path to a file containing the Client ID which should be used. This can also be sourced from the `ARM_CLIENT_ID_FILE_PATH` Environment Variable.
+
 * `environment` - (Optional) The Cloud Environment which should be used. Possible values are `public`, `usgovernment`, `german`, and `china`. Defaults to `public`. This can also be sourced from the `ARM_ENVIRONMENT` Environment Variable.
 
 * `subscription_id` - (Optional) The Subscription ID which should be used. This can also be sourced from the `ARM_SUBSCRIPTION_ID` Environment Variable.
 
-* `tenant_id` - (Optional) The Tenant ID should be used. This can also be sourced from the `ARM_TENANT_ID` Environment Variable.
+* `tenant_id` - (Optional) The Tenant ID which should be used. This can also be sourced from the `ARM_TENANT_ID` Environment Variable.
 
 * `auxiliary_tenant_ids` - (Optional) List of auxiliary Tenant IDs required for multi-tenancy and cross-tenant scenarios. This can also be sourced from the `ARM_AUXILIARY_TENANT_IDS` Environment Variable.
 
 ---
 
 When authenticating as a Service Principal using a Client Certificate, the following fields can be set:
+
+* `client_certificate` - (Optional) A base64-encoded PKCS#12 bundle to be used as the client certificate for authentication. This can also be sourced from the `ARM_CLIENT_CERTIFICATE` environment variable.
 
 * `client_certificate_password` - (Optional) The password associated with the Client Certificate. This can also be sourced from the `ARM_CLIENT_CERTIFICATE_PASSWORD` Environment Variable.
 
@@ -125,17 +133,41 @@ When authenticating as a Service Principal using a Client Secret, the following 
 
 * `client_secret` - (Optional) The Client Secret which should be used. This can also be sourced from the `ARM_CLIENT_SECRET` Environment Variable.
 
+* `client_secret_file_path` - (Optional) The path to a file containing the Client Secret which should be used. This can also be sourced from the `ARM_CLIENT_SECRET_FILE_PATH` Environment Variable.
+
 More information on [how to configure a Service Principal using a Client Secret can be found in this guide](guides/service_principal_client_secret.html).
 
 ---
 
-When authenticating using Managed Service Identity, the following fields can be set:
+When authenticating as a Service Principal using Open ID Connect, the following fields can be set:
 
-* `msi_endpoint` - (Optional) The path to a custom endpoint for Managed Service Identity - in most circumstances, this should be detected automatically. This can also, be sourced from the `ARM_MSI_ENDPOINT` Environment Variable.
+* `oidc_request_token` - (Optional) The bearer token for the request to the OIDC provider. This can also be sourced from the `ARM_OIDC_REQUEST_TOKEN` or `ACTIONS_ID_TOKEN_REQUEST_TOKEN` Environment Variables.
 
-* `use_msi` - (Optional) Should Managed Service Identity be used for Authentication? This can also be sourced from the `ARM_USE_MSI` Environment Variable. Defaults to `false`.
+* `oidc_request_url` - (Optional) The URL for the OIDC provider from which to request an ID token. This can also be sourced from the `ARM_OIDC_REQUEST_URL` or `ACTIONS_ID_TOKEN_REQUEST_URL` Environment Variables.
 
-More information on [how to configure a Service Principal using Managed Service Identity can be found in this guide](guides/managed_service_identity.html).
+* `oidc_token` - (Optional) The ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the `ARM_OIDC_TOKEN` environment Variable.
+
+* `oidc_token_file_path` - (Optional) The path to a file containing an ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the `ARM_OIDC_TOKEN_FILE_PATH` environment Variable.
+
+* `use_oidc` - (Optional) Should OIDC be used for Authentication? This can also be sourced from the `ARM_USE_OIDC` Environment Variable. Defaults to `false`.
+
+More information on [how to configure a Service Principal using OpenID Connect can be found in this guide](guides/service_principal_oidc.html).
+
+---
+
+When authenticating using Managed Identity, the following fields can be set:
+
+* `msi_endpoint` - (Optional) The path to a custom endpoint for Managed Identity - in most circumstances, this should be detected automatically. This can also be sourced from the `ARM_MSI_ENDPOINT` Environment Variable.
+
+* `use_msi` - (Optional) Should Managed Identity be used for Authentication? This can also be sourced from the `ARM_USE_MSI` Environment Variable. Defaults to `false`.
+
+More information on [how to configure a Service Principal using Managed Identity can be found in this guide](guides/managed_service_identity.html).
+
+---
+
+For Azure CLI authentication, the following fields can be set:
+
+* `use_cli` - (Optional) Should Azure CLI be used for authentication? This can also be sourced from the `ARM_USE_CLI` environment variable. Defaults to `true`.
 
 ---
 
@@ -147,7 +179,7 @@ For some advanced scenarios, such as where more granular permissions are necessa
 
 ~> **Note:** `environment` must be set to the requested environment name in the list of available environments held in the `metadata_host`.
 
-* `partner_id` - (Optional) A GUID/UUID that is [registered](https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution#register-guids-and-offers) with Microsoft to facilitate partner resource usage attribution. This can also be sourced from the `ARM_PARTNER_ID` Environment Variable.
+* `partner_id` - (Optional) A GUID/UUID registered with Microsoft to facilitate partner resource [usage attribution](https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution). This can also be sourced from the `ARM_PARTNER_ID` Environment Variable. Supported formats are `<guid>` / `pid-<guid>` (GUIDs [registered](https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution#other-use-cases) in Partner Center) and `pid-<guid>-partnercenter` (for published [commercial marketplace Azure apps](https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution#commercial-marketplace-azure-apps)).
 
 * `auxiliary_tenant_ids` - (Optional) Contains a list of (up to 3) other Tenant IDs used for cross-tenant and multi-tenancy scenarios with multiple AzureRM provider definitions. The list of `auxiliary_tenant_ids` in a given AzureRM provider definition contains the other, remote Tenants and should not include its own `subscription_id` (or `ARM_SUBSCRIPTION_ID` Environment Variable).
 

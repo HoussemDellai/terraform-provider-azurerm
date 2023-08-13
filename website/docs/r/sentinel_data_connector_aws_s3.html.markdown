@@ -25,34 +25,16 @@ resource "azurerm_log_analytics_workspace" "example" {
   sku                 = "PerGB2018"
 }
 
-resource "azurerm_log_analytics_solution" "example" {
-  solution_name         = "SecurityInsights"
-  location              = azurerm_resource_group.example.location
-  resource_group_name   = azurerm_resource_group.example.name
-  workspace_resource_id = azurerm_log_analytics_workspace.example.id
-  workspace_name        = azurerm_log_analytics_workspace.example.name
-
-  plan {
-    publisher = "Microsoft"
-    product   = "OMSGallery/SecurityInsights"
-  }
+resource "azurerm_sentinel_log_analytics_workspace_onboarding" "example" {
+  workspace_id = azurerm_log_analytics_workspace.example.id
 }
 
 resource "azurerm_sentinel_data_connector_aws_s3" "example" {
   name                       = "example"
-  log_analytics_workspace_id = "TODO"
-  aws_role_arn               = "TODO"
-  destination_table          = "TODO"
-  sqs_urls                   = ["example"]
-}
-
-resource "azurerm_sentinel_data_connector_aws_s3" "example" {
-  name                       = "example"
-  log_analytics_workspace_id = azurerm_log_analytics_solution.example.workspace_resource_id
+  log_analytics_workspace_id = azurerm_sentinel_log_analytics_workspace_onboarding.example.workspace_id
   aws_role_arn               = "arn:aws:iam::000000000000:role/role1"
   destination_table          = "AWSGuardDuty"
   sqs_urls                   = ["https://sqs.us-east-1.amazonaws.com/000000000000/example"]
-  depends_on                 = [azurerm_log_analytics_solution.example]
 }
 ```
 
@@ -72,13 +54,13 @@ The following arguments are supported:
 
 ## Attributes Reference
 
-In addition to the Arguments listed above - the following Attributes are exported: 
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the AWS S3 Data Connector.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the AWS S3 Data Connector.
 * `read` - (Defaults to 5 minutes) Used when retrieving the AWS S3 Data Connector.

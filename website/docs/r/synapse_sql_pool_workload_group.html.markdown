@@ -43,6 +43,10 @@ resource "azurerm_synapse_workspace" "example" {
   storage_data_lake_gen2_filesystem_id = azurerm_storage_data_lake_gen2_filesystem.example.id
   sql_administrator_login              = "sqladminuser"
   sql_administrator_login_password     = "H@Sh1CoR3!"
+
+  identity {
+    type = "SystemAssigned"
+  }
 }
 
 resource "azurerm_synapse_sql_pool" "example" {
@@ -78,9 +82,9 @@ The following arguments are supported:
 
 ---
 
-* `importance` - (Optional) The workload group importance level.
+* `importance` - (Optional) The workload group importance level. Defaults to `normal`.
 
-* `max_resource_percent_per_request` - (Optional) The workload group request maximum grant percentage.
+* `max_resource_percent_per_request` - (Optional) The workload group request maximum grant percentage. Defaults to `3`.
 
 * `min_resource_percent_per_request` - (Optional) The workload group request minimum grant percentage.
 
@@ -88,13 +92,13 @@ The following arguments are supported:
 
 ## Attributes Reference
 
-In addition to the Arguments listed above - the following Attributes are exported: 
+In addition to the Arguments listed above - the following Attributes are exported:
 
 * `id` - The ID of the Synapse SQL Pool Workload Group.
 
 ## Timeouts
 
-The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/docs/configuration/resources.html#timeouts) for certain actions:
+The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/language/resources/syntax#operation-timeouts) for certain actions:
 
 * `create` - (Defaults to 30 minutes) Used when creating the Synapse SQL Pool Workload Group.
 * `read` - (Defaults to 5 minutes) Used when retrieving the Synapse SQL Pool Workload Group.

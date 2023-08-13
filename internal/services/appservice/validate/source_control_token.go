@@ -1,8 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package validate
 
 import "fmt"
 
-const expectedID = "/providers/Microsoft.Web/sourcecontrols/GitHub"
+const expectedID = "/providers/Microsoft.Web/sourceControls/GitHub"
 
 func AppServiceSourceControlTokenID(input interface{}, key string) (warnings []string, errors []error) {
 	v, ok := input.(string)

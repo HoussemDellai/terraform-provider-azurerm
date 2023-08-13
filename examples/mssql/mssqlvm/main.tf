@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 provider "azurerm" {
   features {}
 }
@@ -96,7 +99,7 @@ resource "azurerm_virtual_machine" "example" {
     publisher = "MicrosoftSQLServer"
     offer     = "SQL2017-WS2016"
     sku       = "SQLDEV"
-    version   = "laexample"
+    version   = "latest"
   }
 
   storage_os_disk {
